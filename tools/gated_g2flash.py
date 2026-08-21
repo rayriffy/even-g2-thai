@@ -250,6 +250,21 @@ def check_ready(
         raise ValueError("patch specification has an invalid base filename")
     target_version = base_match.group(1)
 
+    if operation == "discover":
+        validate_operation(arguments, operation)
+        if git_output(g2flash_root, "rev-parse", "HEAD") != G2FLASH_COMMIT:
+            raise ValueError(f"g2flash must be pinned to {G2FLASH_COMMIT}")
+        status_lines = git_output(
+            g2flash_root, "status", "--porcelain", "--untracked-files=all"
+        ).splitlines()
+        if any(line != "?? .DS_Store" for line in status_lines):
+            raise ValueError("g2flash has local source changes; use a fresh clean checkout")
+        interpreter = g2flash_root / "venv/bin/python"
+        script = g2flash_root / "g2flash.py"
+        if not interpreter.is_file() or not script.is_file():
+            raise ValueError("pinned g2flash virtualenv or script is missing")
+        return interpreter
+
     record_path = project_root / f"docs/rebases/{target_version}.json"
     if not record_path.is_file():
         raise ValueError(f"missing compatibility record {record_path}")
@@ -305,18 +320,15 @@ def check_ready(
     validate_selection_record(selection_record, target_version, compatibility, artifact)
     validate_operation(arguments, operation)
 
-    if operation == "discover":
-        firmware = None
-    else:
-        firmware = firmware_argument(arguments)
-        if not firmware.is_file():
-            raise ValueError(f"firmware image does not exist: {firmware}")
-        firmware_hash = sha256_file(firmware)
-        expected_hash = (
-            patch_spec["base_sha256"] if operation == "rollback" else patch_spec["output_sha256"]
-        )
-        if firmware_hash != expected_hash:
-            raise ValueError(f"{operation} operation received the wrong firmware artifact")
+    firmware = firmware_argument(arguments)
+    if not firmware.is_file():
+        raise ValueError(f"firmware image does not exist: {firmware}")
+    firmware_hash = sha256_file(firmware)
+    expected_hash = (
+        patch_spec["base_sha256"] if operation == "rollback" else patch_spec["output_sha256"]
+    )
+    if firmware_hash != expected_hash:
+        raise ValueError(f"{operation} operation received the wrong firmware artifact")
 
     if git_output(g2flash_root, "rev-parse", "HEAD") != G2FLASH_COMMIT:
         raise ValueError(f"g2flash must be pinned to {G2FLASH_COMMIT}")
@@ -362,12 +374,6 @@ def main() -> int:
         print(f"flash preflight blocked: {error}", file=sys.stderr)
         return 2
     if args.operation == "discover":
-        protected = json.loads(selection_record.read_text())
-        endpoints = protected["endpoints"]
-        environment = {
-            "LEFT_NAME": endpoints["left_name"],
-            "RIGHT_NAME": endpoints["right_name"],
-        }
         discovery = (
             "import asyncio\n"
             "from bleak import BleakScanner\n"
@@ -375,15 +381,11 @@ def main() -> int:
             "    devices = await BleakScanner.discover(timeout=20, return_adv=True)\n"
             "    for address, (device, advertisement) in devices.items():\n"
             "        name = advertisement.local_name or device.name or ''\n"
-            "        if name == __import__('os').environ['LEFT_NAME']: print('left', address)\n"
-            "        if name == __import__('os').environ['RIGHT_NAME']: print('right', address)\n"
+            "        if '_L_' in name: print('left', address)\n"
+            "        elif '_R_' in name: print('right', address)\n"
             "asyncio.run(scan())\n"
         )
-        process = subprocess.run(
-            [str(interpreter), "-c", discovery],
-            check=False,
-            env={**os.environ, **environment},
-        )
+        process = subprocess.run([str(interpreter), "-c", discovery], check=False)
     else:
         try:
             verify_ble_endpoints(interpreter, forwarded, selection_record)
