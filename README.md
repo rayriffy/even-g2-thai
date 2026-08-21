@@ -55,6 +55,25 @@ or flashing. It covers official OTA discovery, APK/API analysis, address
 relocation, checksum and MRAM gates, rollback evidence, and worked versioned
 rebase records.
 
+## Flashing companion (vendored WebFlasher)
+
+Hardware flashes use the charging-case USB writer from AM-Guru's
+`evenRealities-webflasher`, vendored as a submodule at
+`third_party/evenRealities-webflasher` and carried as
+[`patches/webflasher_case_usb_thai.patch`](patches/webflasher_case_usb_thai.patch)
+on top of pinned upstream commit `c437fdf`. The patch adds an exact-hash
+Case-USB pin for this artifact (`localTempleFlashTargets.js`); direct Bluetooth
+flashing stays rejected.
+
+```sh
+make webflasher
+```
+
+The target initializes the submodule, applies the patch idempotently, and
+verifies that the writer pin matches the built artifact's bundle and main
+payload hashes. Run the vendored project's own tests and production build
+inside the submodule before touching hardware.
+
 ## Scope and current boundary
 
 - Thai code points `U+0E01..U+0E3A`, `U+0E3F`, and `U+0E40..U+0E5B`.

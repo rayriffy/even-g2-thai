@@ -112,16 +112,22 @@ Do not proceed unless both sides report discovery success and
 The BLE path below stays gated: the protected `device-ota-info.json` selection
 record was never captured, so the compatibility record remains `unverified` and
 `gated_g2flash.py` intentionally blocks transport and flash. The working route
-is the local
-[`evenRealities-webflasher`](https://github.com/AM-Guru/evenRealities-webflasher)
-build (Mac USB-C → case CH341 serial → temporary case SRAM bridge → pogo
-contacts → seated temple):
+is AM-Guru's `evenRealities-webflasher` Case-USB writer (Mac USB-C → case
+CH341 serial → temporary case SRAM bridge → pogo contacts → seated temple).
+This repository vendors it: `make webflasher` clones the submodule at pinned
+upstream commit `c437fdf`, applies
+[`patches/webflasher_case_usb_thai.patch`](../patches/webflasher_case_usb_thai.patch),
+and checks the exact-hash pin against the built artifact. A personal checkout
+at `/Users/rayriffy/Git/evenRealities-webflasher` with the same local changes
+works identically.
 
-1. Build the artifact (`make check`) and copy its two hashes — whole bundle and
-   `ota/s200_firmware_ota.bin` payload — into the exact-hash pin in
-   `src/lib/localTempleFlashTargets.js`, then run the WebFlasher tests/build.
-   The Case-USB writer re-hashes the loaded file against that pin before any
-   byte is sent; a mismatching file is rejected.
+1. Build the artifact (`make check`), then `make webflasher`. When the hashes
+   change, regenerate the pin by updating the copy of
+   `src/lib/localTempleFlashTargets.js` inside the patch
+   (`patches/webflasher_case_usb_thai.patch`) with the new whole-bundle and
+   `ota/s200_firmware_ota.bin` values and re-running `make webflasher`; the
+   Case-USB writer re-hashes the loaded file against that pin before any byte
+   is sent, and a mismatching file is rejected.
 2. Open Advanced Mode → Recovery Console → "Running-temple recovery through
    the Case". Never use the automatic "Recover with update over USB" panel:
    it selects the official stock catalog image.

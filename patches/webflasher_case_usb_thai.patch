@@ -1,0 +1,310 @@
+diff --git a/README.md b/README.md
+index 3ff34bf..effda9e 100644
+--- a/README.md
++++ b/README.md
+@@ -977,6 +977,12 @@ This is an application-alive reinstall path. If the temple no longer answers
+ the version preflight, do not attempt it repeatedly: use a separately proven
+ SBL/MRAM-recovery or SWD route.
+ 
++The local Thai G2 2.2.9.22 build is a narrow exception to the official-bundle
++rule. The browser accepts only its exact whole-bundle SHA-256 and Apollo-main
++SHA-256 through the Case USB writer; it cannot stage the Case component and is
++blocked from Bluetooth transfer. Its Case-USB transfer is hash-pinned but has
++not yet been validated on hardware.
++
+ ### Direct Bluetooth update
+ 
+ 1. Remove both temples from the Case. Close the Even app or turn off Bluetooth
+diff --git a/scripts/build-firmware-archive.mjs b/scripts/build-firmware-archive.mjs
+index 4fa0b48..6d12732 100644
+--- a/scripts/build-firmware-archive.mjs
++++ b/scripts/build-firmware-archive.mjs
+@@ -7,6 +7,7 @@ import process from "node:process";
+ import { fileURLToPath } from "node:url";
+ import { unzipSync } from "fflate";
+ import { parseEvenOTA } from "../src/lib/firmware.js";
++import { LOCAL_G2_TEMPLE_FLASH_TARGETS } from "../src/lib/localTempleFlashTargets.js";
+ 
+ const CDN_BASE = "https://cdn.evenreal.co/firmware";
+ function r1Release({
+@@ -945,8 +946,11 @@ async function writeTempleFlashTargets(releases) {
+ // been exercised on hardware. Pinned-but-unvalidated images are still gated on
+ // exact hashes; they simply have no transfer evidence behind them yet.
+ 
++import { LOCAL_G2_TEMPLE_FLASH_TARGETS } from "./localTempleFlashTargets.js";
++
+ export const TEMPLE_FLASH_TARGETS = Object.freeze([
+ ${entries},
++  ...LOCAL_G2_TEMPLE_FLASH_TARGETS,
+ ]);
+ 
+ export function findTempleFlashTarget(imageSha256) {
+diff --git a/src/App.jsx b/src/App.jsx
+index 6b915ca..91980b5 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -2280,9 +2280,12 @@ function App() {
+   const acceptPreparedFirmware = (accepted) => {
+     if (
+       accepted.kind === "bundle" &&
+-      accepted.provenance.channel !== "official"
++      accepted.provenance.channel !== "official" &&
++      !accepted.templeFlashEligible
+     ) {
+-      throw new Error("This fork accepts only official G2 firmware bundles.");
++      throw new Error(
++        "This fork accepts official bundles and exact local Case-USB firmware pins only.",
++      );
+     }
+     if (accepted.firmwareRevocation) {
+       throw new Error(
+@@ -5742,7 +5745,7 @@ function App() {
+                   </select>
+                 </label>
+                 <p className="flash-mode-fixed">
+-                  Transfer mode · Complete pinned official Apollo main
++                  Transfer mode · Complete exact-pinned Apollo main
+                 </p>
+                 <label className="pogo-confirm">
+                   <input
+@@ -5793,7 +5796,7 @@ function App() {
+                 </Button>
+                 {!firmware?.templeFlashEligible ? (
+                   <small className="pogo-presence-warning">
+-                    Load an official pinned image from the verified library in Choose image.
++                    Load an exact-pinned image from the verified library or local Thai build.
+                   </small>
+                 ) : !firmware.templeFlashTarget?.hardwareValidated ? (
+                   <small className="pogo-presence-warning">
+diff --git a/src/lib/catalogCoverage.js b/src/lib/catalogCoverage.js
+index 47afe52..7e695be 100644
+--- a/src/lib/catalogCoverage.js
++++ b/src/lib/catalogCoverage.js
+@@ -62,6 +62,7 @@ export function findUnservedPinnedImages({ catalog, targets } = {}) {
+   if (newestServed === null) return [];
+ 
+   return targets.filter((target) => {
++    if (target?.localOnly) return false;
+     const hash = String(target?.imageSha256 ?? "").toLowerCase();
+     if (!hash || servedHashes.has(hash)) return false;
+     return compareFirmwareVersions(target?.version, newestServed) > 0;
+diff --git a/src/lib/firmware.js b/src/lib/firmware.js
+index 642d29d..0e29e6c 100644
+--- a/src/lib/firmware.js
++++ b/src/lib/firmware.js
+@@ -1,4 +1,5 @@
+ import { findTempleFlashTarget } from "./templeFlashTargets.js";
++import { LOCAL_G2_TEMPLE_FLASH_TARGETS } from "./localTempleFlashTargets.js";
+ 
+ export const EVENOTA_MAGIC = new Uint8Array([
+   0x45, 0x56, 0x45, 0x4e, 0x4f, 0x54, 0x41, 0x00,
+@@ -1027,6 +1028,19 @@ export function parseMainOTAPreamble(payload) {
+ 
+ export function classifyG2Firmware(fileSha256) {
+   const digest = fileSha256.toLowerCase();
++  const localPinned = LOCAL_G2_TEMPLE_FLASH_TARGETS.find(
++    (release) => release.imageSha256 === digest,
++  );
++  if (localPinned) {
++    return {
++      channel: "custom",
++      trust: "local-hash-pinned",
++      label: localPinned.label,
++      version: localPinned.version,
++      baseVersion: localPinned.baseVersion,
++      capabilities: localPinned.capabilities,
++    };
++  }
+   const reviewed = [
+     REVIEWED_G2FLASH_CFW_2_2_6_11,
+     REVIEWED_CFW_2_2_8_10,
+diff --git a/src/lib/g2BleOta.js b/src/lib/g2BleOta.js
+index 930b49b..7a95cf4 100644
+--- a/src/lib/g2BleOta.js
++++ b/src/lib/g2BleOta.js
+@@ -921,6 +921,11 @@ export function assertPinnedG2BleBundle(firmware) {
+       "Direct Bluetooth recovery is restricted to an exact hash-pinned G2 temple bundle.",
+     );
+   }
++  if (firmware.templeFlashTarget.localOnly) {
++    throw new Error(
++      "This local firmware pin is approved only for the charging-case USB writer.",
++    );
++  }
+   const components = firmware.componentImages;
+   if (!Array.isArray(components) || components.length !== EXPECTED_COMPONENTS.length) {
+     throw new Error(
+diff --git a/src/lib/localTempleFlashTargets.js b/src/lib/localTempleFlashTargets.js
+new file mode 100644
+index 0000000..3e96428
+--- /dev/null
++++ b/src/lib/localTempleFlashTargets.js
+@@ -0,0 +1,22 @@
++// Locally supplied firmware that is intentionally allowed only through the
++// charging-case writer. These pins are independent of the hosted catalog: a
++// local file must match the whole-bundle and Apollo-main digests below.
++
++export const LOCAL_G2_TEMPLE_FLASH_TARGETS = Object.freeze([
++  Object.freeze({
++    imageSha256: "6316fb5d83200e73c7f34863aa082b050dfbaad7aaafa9139dce5de577cf9731",
++    mainSha256: "ef8726c3a8d99c9d4c5a4cc3b68d658a76de01953d068e8ebbff17beef68732a",
++    mainBytes: 3842784,
++    version: "2.2.9.22",
++    reportedVersion: "2.2.9.22",
++    label: "Thai G2 2.2.9.22 · local Case USB only",
++    hardwareValidated: false,
++    localOnly: true,
++    baseVersion: "2.2.9.22",
++    capabilities: [
++      "Uses the stock G2 2.2.9.22 container with a Thai SARA AM tone-mark positioning patch.",
++      "Accepted only through the charging-case USB writer; direct Bluetooth update remains blocked.",
++      "Hash-pinned and structurally verified, but not yet validated by a Case-USB hardware transfer.",
++    ],
++  }),
++]);
+diff --git a/src/lib/templeFlashTargets.js b/src/lib/templeFlashTargets.js
+index 9f9dc03..c56408b 100644
+--- a/src/lib/templeFlashTargets.js
++++ b/src/lib/templeFlashTargets.js
+@@ -10,6 +10,8 @@
+ // been exercised on hardware. Pinned-but-unvalidated images are still gated on
+ // exact hashes; they simply have no transfer evidence behind them yet.
+ 
++import { LOCAL_G2_TEMPLE_FLASH_TARGETS } from "./localTempleFlashTargets.js";
++
+ export const TEMPLE_FLASH_TARGETS = Object.freeze([
+   Object.freeze({
+     imageSha256: "a03fbea9f68a9de6bc271daabb9f3a41c59053d1086622c76a4e990f829cc561",
+@@ -146,6 +148,7 @@ export const TEMPLE_FLASH_TARGETS = Object.freeze([
+     label: "Stock Even Realities G2 2.0.1.14",
+     hardwareValidated: false,
+   }),
++  ...LOCAL_G2_TEMPLE_FLASH_TARGETS,
+ ]);
+ 
+ export function findTempleFlashTarget(imageSha256) {
+diff --git a/tests/catalog-coverage.test.mjs b/tests/catalog-coverage.test.mjs
+index 7472727..8d2f58c 100644
+--- a/tests/catalog-coverage.test.mjs
++++ b/tests/catalog-coverage.test.mjs
+@@ -95,6 +95,22 @@ test("blocks firmware mutation when the served library is behind the build", ()
+   );
+ });
+ 
++test("does not require local-only pins in the hosted firmware catalog", () => {
++  assert.deepEqual(
++    findUnservedPinnedImages({
++      catalog: STALE_PRODUCTION_CATALOG,
++      targets: [
++        {
++          imageSha256: "c".repeat(64),
++          version: "9.9.9.9",
++          localOnly: true,
++        },
++      ],
++    }),
++    [],
++  );
++});
++
+ test("offers only official firmware and covers every compiled writer target", async () => {
+   const catalog = JSON.parse(
+     await readFile(
+diff --git a/tests/firmware.test.mjs b/tests/firmware.test.mjs
+index aa6636f..6cc2bd5 100644
+--- a/tests/firmware.test.mjs
++++ b/tests/firmware.test.mjs
+@@ -32,6 +32,7 @@ import {
+   toggledBankOptionBytes,
+   writeU32LE,
+ } from "../src/lib/firmware.js";
++import { LOCAL_G2_TEMPLE_FLASH_TARGETS } from "../src/lib/localTempleFlashTargets.js";
+ import {
+   POGO_BRIDGE_OBSERVED_33_SHA256,
+   POGO_BRIDGE_SHA256,
+@@ -193,6 +194,14 @@ test("recognizes the exact reviewed CFW trust pin", () => {
+   );
+ });
+ 
++test("recognizes the exact local Thai G2 2.2.9.22 pin", () => {
++  const thai = LOCAL_G2_TEMPLE_FLASH_TARGETS[0];
++  const trust = classifyG2Firmware(thai.imageSha256);
++  assert.equal(trust.trust, "local-hash-pinned");
++  assert.equal(trust.baseVersion, "2.2.9.22");
++  assert.equal(trust.capabilities.some((value) => /Thai SARA AM/i.test(value)), true);
++});
++
+ test("recognizes the g2flash-based G2 2.2.6.11 trust pin", () => {
+   const trust = classifyG2Firmware(REVIEWED_G2FLASH_CFW_2_2_6_11.sha256);
+   assert.equal(trust.trust, "reviewed-custom");
+diff --git a/tests/g2-ble-ota.test.mjs b/tests/g2-ble-ota.test.mjs
+index 87e8e8f..b3b8a13 100644
+--- a/tests/g2-ble-ota.test.mjs
++++ b/tests/g2-ble-ota.test.mjs
+@@ -913,6 +913,14 @@ test("the direct BLE writer accepts only the complete pinned topology", () => {
+       }),
+     /complete 6-component/,
+   );
++  assert.throws(
++    () =>
++      assertPinnedG2BleBundle({
++        ...firmware,
++        templeFlashTarget: { ...target, localOnly: true },
++      }),
++    /charging-case USB writer/,
++  );
+ });
+ 
+ test("the chooser rejects a temple from the wrong side", async () => {
+diff --git a/tests/pogo-flash.test.mjs b/tests/pogo-flash.test.mjs
+index 3ad1983..fa62e35 100644
+--- a/tests/pogo-flash.test.mjs
++++ b/tests/pogo-flash.test.mjs
+@@ -38,6 +38,7 @@ import {
+   verifyPogoFlashOppositePhaseStop,
+   verifyPogoFlashZeroWriteSetupStop,
+ } from "../src/lib/pogoFlashBridge.js";
++import { LOCAL_G2_TEMPLE_FLASH_TARGETS } from "../src/lib/localTempleFlashTargets.js";
+ import { sha256Hex, writeU32LE } from "../src/lib/firmware.js";
+ import {
+   G2CaseSession,
+@@ -1809,23 +1810,26 @@ test("keeps the generated pin table in sync with the firmware archive", async ()
+       "utf8",
+     ),
+   );
+-  const expected = index.releases
+-    .map((release) => ({
++  const expected = [
++    ...index.releases
++      .map((release) => ({
+       release,
+       main: (release.components ?? []).find(
+         (c) => c.name === "ota/s200_firmware_ota.bin" && c.typeId === 0,
+       ),
+-    }))
+-    .filter(({ main }) => main?.sha256)
+-    .map(({ release, main }) => ({
+-      imageSha256: release.sha256,
+-      mainSha256: main.sha256,
+-      mainBytes: main.size,
+-      version: release.internalVersion ?? release.version,
+-      reportedVersion:
+-        release.reportedVersion ?? release.internalVersion ?? release.version,
+-      hardwareValidated: HARDWARE_VALIDATED_IMAGE_SHA256.has(release.sha256),
+-    }));
++      }))
++      .filter(({ main }) => main?.sha256)
++      .map(({ release, main }) => ({
++        imageSha256: release.sha256,
++        mainSha256: main.sha256,
++        mainBytes: main.size,
++        version: release.internalVersion ?? release.version,
++        reportedVersion:
++          release.reportedVersion ?? release.internalVersion ?? release.version,
++        hardwareValidated: HARDWARE_VALIDATED_IMAGE_SHA256.has(release.sha256),
++      })),
++    ...LOCAL_G2_TEMPLE_FLASH_TARGETS.map(({ label, ...rest }) => rest),
++  ];
+   assert.deepEqual(
+     TEMPLE_FLASH_TARGETS.map(({ label, ...rest }) => rest),
+     expected,
