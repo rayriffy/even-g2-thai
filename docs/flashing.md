@@ -71,8 +71,7 @@ only after the compatibility record is verified:
 
 ```sh
 python3 tools/gated_g2flash.py --g2flash-root ../g2flash \
-  --operation discover \
-  --selection-record /secure/path/to/device-ota-info.json
+  --operation discover
 ```
 
 The names contain `_L_` and `_R_`; copy their corresponding UUIDs as
@@ -107,6 +106,39 @@ Do not proceed unless both sides report discovery success and
 `stopping before FILE_CHECK`.
 
 ## 4. Flash explicitly
+
+### 4a. Charging-case USB route (used for all hardware flashes so far)
+
+The BLE path below stays gated: the protected `device-ota-info.json` selection
+record was never captured, so the compatibility record remains `unverified` and
+`gated_g2flash.py` intentionally blocks transport and flash. The working route
+is the local
+[`evenRealities-webflasher`](https://github.com/AM-Guru/evenRealities-webflasher)
+build (Mac USB-C → case CH341 serial → temporary case SRAM bridge → pogo
+contacts → seated temple):
+
+1. Build the artifact (`make check`) and copy its two hashes — whole bundle and
+   `ota/s200_firmware_ota.bin` payload — into the exact-hash pin in
+   `src/lib/localTempleFlashTargets.js`, then run the WebFlasher tests/build.
+   The Case-USB writer re-hashes the loaded file against that pin before any
+   byte is sent; a mismatching file is rejected.
+2. Open Advanced Mode → Recovery Console → "Running-temple recovery through
+   the Case". Never use the automatic "Recover with update over USB" panel:
+   it selects the official stock catalog image.
+3. Flash **one lens at a time**. After each flash: confirm the Even app still
+   connects, double-tap the dimple repeatedly to prove the dashboard opens
+   without a reset, then test `น้ำ`, `เก่ง`, `ภาษาไทย`. Only then flash the
+   other lens.
+4. The patched app intentionally reports stock version `2.2.9.22`; the version
+   string cannot distinguish Thai from stock. Physical dashboard/rendering
+   behavior is the only verification.
+5. Rollback uses the same manual panel with the verified stock bundle from
+   `.cache/g2_2.2.9.22.bin`.
+
+Direct Bluetooth flashing of the Thai artifact is rejected by WebFlasher by
+design (`localOnly` pin).
+
+### 4b. Gated BLE route (blocked until the compatibility gate closes)
 
 Start with one lens so the other remains a working reference:
 

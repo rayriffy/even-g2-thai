@@ -69,16 +69,57 @@ and [Microsoft's Thai OpenType model](https://learn.microsoft.com/en-us/typograp
 
 The stock rendering-only helper `lv_text_encoded_letter_next_2` is at
 `0x00491BA4`; its authenticated first four bytes are `2d e9 f0 41`. Five direct
-call sites cover label drawing and text measurement paths. The
-patch replaces its entry with a `B.W` to a wrapper that maps a tone mark whose
-next character is SARA AM to `U+F700..U+F703`. Text storage and the global UTF-8
-decoder remain untouched. The wrapper delegates normal decoding to the
-relocated stock UTF-8 helper at `0x00491E24`.
+call sites cover label drawing and text measurement paths. The helper obtains
+its UTF-8 decoder through the double pointer at `0x00491F14` (slot address,
+then function pointer, runtime-initialized by the firmware) and calls the
+decoder's lookahead pass with a NULL offset argument; the decoder at
+`0x00491CC6` substitutes a stack slot when the offset pointer is NULL. An
+earlier wrapper revision called `0x00491E24` directly, misidentified as the
+UTF-8 helper; its prologue dereferences the offset pointer unconditionally and
+faulted on that NULL lookahead on every multi-character label. The patch
+replaces the helper's entry with a `B.W` to a wrapper that resolves the decoder
+through `0x00491F14`, maps a tone mark whose next character is SARA AM to
+`U+F700..U+F703`, and leaves text storage and the global UTF-8 decoder
+untouched.
 
 Each PUA record reuses the original tone bitmap and raises only its `ofs_y`.
 The generator computes the smallest per-size displacement that makes all A4
 pixels at alpha 4 or higher disjoint from the SARA AM bitmap. This removes the
 collision without raising ordinary tone marks such as the one in `เก่ง`.
+
+## Stock font architecture and the CJK pipeline
+
+Binary strings and relocated code in 2.2.9.22 show how stock renders non-Latin
+scripts:
+
+- LVGL 9.3 integrates FreeType 2.9.1 (`lv_freetype_font_create`,
+  `lv_freetype_set_cbs_outline_font`, `lv_freetype_set_cbs_image_font`) plus an
+  Ambiq vector draw layer (`lv_draw_ambiq_vector_font.c`,
+  `lv_draw_ambiq_vector_font_ft_cb`).
+- The first-party `lvgl_font_manager.c` builds the two fallback chains this
+  patch extends ("Font initialization completed - background: %p,
+  foreground: %p") from static configs through `font_manager_create_chain`.
+- Fonts come in two kinds: runtime-rasterized FreeType vector fonts, and
+  precompiled binary fonts loaded from external XIP flash
+  (`XIP font load from flash, Name = %s`; utility examples reference
+  `s200_font.bin` at `0x80100000`).
+- Font banks have their own OTA channel (`eOTATransmitType_FONT`), independent
+  of Apollo firmware updates.
+- UI language is a settings index (`SVC_KvdbReadLanguage`,
+  `set_general_configure_language`).
+- There is no HarfBuzz and no shaping engine anywhere in the image. Chinese
+  needs none (per-character han), Korean renders from precomposed hangul
+  syllables, so the FreeType path suffices. No Thai strings or Thai font exist
+  in stock; Thai is not an officially supported device language.
+
+The Thai fallback therefore reuses stock's integration surface while differing
+in glyph source: it appends a standard callback-based `lv_font_t` to the same
+manager-built chains (identical interface to FreeType's callback fonts), but
+serves precomputed A4-packed Noto Sans Thai bitmaps embedded in the Apollo
+append instead of rasterizing a TTF from the un-reversed font-bank protocol.
+That keeps the patch inside one OTA, heap-free, and deterministic, at the cost
+of fixed sizes (8) and coverage (132 codepoints) versus arbitrary vector
+rendering.
 
 ## Firmware integrity
 
