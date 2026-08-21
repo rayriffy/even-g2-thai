@@ -156,8 +156,29 @@ class ThaiPatchTests(unittest.TestCase):
         self.assertIn("#define GLYPH_DSC_FORMAT_OFFSET 14u", source)
         self.assertIn("#define GLYPH_DSC_GID_OFFSET 24u", source)
         self.assertIn("#define STOCK_CHAIN_BUILD_THUMB 0x00470989u", source)
-        self.assertIn("#define STOCK_UTF8_NEXT_THUMB 0x00491E25u", source)
+        self.assertIn("#define STOCK_DECODE_SLOT_INDIRECT 0x00491F14u", source)
+        self.assertNotIn("STOCK_UTF8_NEXT_THUMB", source)
         self.assertIn("uint32_t *active_offset = offset ? offset : &local_offset;", source)
+        self.assertIn("next = decode(text + *active_offset, 0);", source)
+
+    def test_chain_append_only_writes_writable_ram(self) -> None:
+        source = (ROOT / "patches/thai_font.c").read_text()
+        self.assertIn("#define WRITABLE_RAM_BASE 0x20000000u", source)
+        self.assertIn("#define WRITABLE_RAM_END 0x20080000u", source)
+        self.assertIn("if(!writable_ram_node(last)) return chain_ptr;", source)
+
+    def test_chain_append_never_writes_through_thai_font(self) -> None:
+        source = (ROOT / "patches/thai_font.c").read_text()
+        self.assertIn("static int is_thai_font(const uint32_t *font)", source)
+        for size in (16, 20, 24, 28, 32, 36, 40, 48):
+            self.assertIn(f"font == thai_font_{size}", source)
+        self.assertIn("void *thai_chain_append(void *chain_ptr)", source)
+        self.assertIn("if(!root || is_thai_font(root)) return chain_ptr;", source)
+        self.assertIn(
+            "if(is_thai_font((const uint32_t *)(uintptr_t)next)) return chain_ptr;",
+            source,
+        )
+        self.assertIn("return thai_chain_append(chain);", source)
 
     def test_stock_fetch_preserves_existing_rollback_file(self) -> None:
         source = (ROOT / "build_thai.sh").read_text()

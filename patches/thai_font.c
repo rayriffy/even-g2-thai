@@ -15,7 +15,15 @@
 #define FONT_DATA_MAGIC 0xA11D0003u
 #define LV_FONT_GLYPH_FORMAT_A8 0x08u
 #define STOCK_CHAIN_BUILD_THUMB 0x00470989u
-#define STOCK_UTF8_NEXT_THUMB 0x00491E25u
+/* The stock letter helper loads its UTF-8 decoder through the double pointer
+   at 0x00491F14 (slot address, then function pointer) so it always matches
+   the firmware's active text encoder. Calling any hardcoded entry instead
+   breaks that contract: the helper at 0x00491E24 dereferences its offset
+   argument unconditionally and faults when the lookahead pass passes NULL,
+   which is exactly how the stock helper invokes its decoder. */
+#define STOCK_DECODE_SLOT_INDIRECT 0x00491F14u
+#define WRITABLE_RAM_BASE 0x20000000u
+#define WRITABLE_RAM_END 0x20080000u
 #define GLYPH_DSC_SIZE 32u
 #define GLYPH_DSC_FORMAT_OFFSET 14u
 #define GLYPH_DSC_GID_OFFSET 24u
@@ -32,7 +40,7 @@ typedef struct {
 } thai_glyph_t;
 
 typedef void *(*stock_chain_build_fn)(void *configs, uint32_t count);
-typedef uint32_t (*stock_utf8_next_fn)(const char *text, uint32_t *offset);
+typedef uint32_t (*stock_decode_fn)(const char *text, uint32_t *offset);
 typedef void (*flush_cache_fn)(const void *draw_buf, const void *area);
 
 /* Exact 32-bit lv_font_t word layout for the authenticated LVGL 9.3 build. */
@@ -154,14 +162,22 @@ const void *thai_get_glyph_bitmap(void *glyph_dsc, void *draw_buf) {
     return draw_buf;
 }
 
+static stock_decode_fn stock_decoder(void) {
+    uint32_t storage = read_u32((const uint8_t *)(uintptr_t)STOCK_DECODE_SLOT_INDIRECT);
+    if(!storage) return 0;
+    return (stock_decode_fn)(uintptr_t)read_u32((const uint8_t *)(uintptr_t)storage);
+}
+
 __attribute__((used, noinline))
 void thai_text_encoded_letter_next_2(const char *text, uint32_t *letter,
                                      uint32_t *letter_next, uint32_t *offset) {
-    stock_utf8_next_fn stock_next = (stock_utf8_next_fn)(uintptr_t)STOCK_UTF8_NEXT_THUMB;
+    stock_decode_fn decode = stock_decoder();
     uint32_t local_offset = 0;
     uint32_t *active_offset = offset ? offset : &local_offset;
-    uint32_t current = stock_next(text, active_offset);
-    uint32_t next = current ? stock_next(text + *active_offset, 0) : 0;
+    uint32_t current = 0;
+    uint32_t next = 0;
+    if(decode) current = decode(text, active_offset);
+    if(decode && current) next = decode(text + *active_offset, 0);
     if(current >= TONE_MARK_START && current < TONE_MARK_START + ALT_COUNT && next == SARA_AM) {
         current = ALT_START + current - TONE_MARK_START;
     }
@@ -169,24 +185,47 @@ void thai_text_encoded_letter_next_2(const char *text, uint32_t *letter,
     *letter_next = next;
 }
 
+static int is_thai_font(const uint32_t *font) {
+    return font == thai_font_16 || font == thai_font_20 ||
+           font == thai_font_24 || font == thai_font_28 ||
+           font == thai_font_32 || font == thai_font_36 ||
+           font == thai_font_40 || font == thai_font_48;
+}
+
+static int writable_ram_node(const uint32_t *node) {
+    uintptr_t address = (uintptr_t)node;
+    return address >= WRITABLE_RAM_BASE && address < WRITABLE_RAM_END;
+}
+
+/* Appending must be idempotent: the stock builder runs again whenever a new
+   dashboard is created, and a previous append persists in the stock font
+   objects. Walking into an injected Thai font and storing its fallback word
+   would write into const firmware flash and reset the lens, so every node is
+   checked before any mutation and cycles or over-long chains are left alone. */
+__attribute__((used, noinline))
+void *thai_chain_append(void *chain_ptr) {
+    uint32_t *root = (uint32_t *)(uintptr_t)read_u32((const uint8_t *)chain_ptr);
+    if(!root || is_thai_font(root)) return chain_ptr;
+    uint32_t *last = root;
+    for(uint32_t depth = 1u; depth < 12u; depth++) {
+        uint32_t next = last[7];
+        if(!next) {
+            /* Only a verified writable stock node may receive the fallback
+               pointer; XIP or flash tails are left untouched. */
+            if(!writable_ram_node(last)) return chain_ptr;
+            last[7] = (uint32_t)(uintptr_t)font_for_line_height(root[3]);
+            return chain_ptr;
+        }
+        if(is_thai_font((const uint32_t *)(uintptr_t)next)) return chain_ptr;
+        last = (uint32_t *)(uintptr_t)next;
+    }
+    return chain_ptr;
+}
+
 __attribute__((used, noinline))
 void *thai_chain_build(void *configs, uint32_t count) {
     stock_chain_build_fn stock = (stock_chain_build_fn)(uintptr_t)STOCK_CHAIN_BUILD_THUMB;
     uint8_t *chain = (uint8_t *)stock(configs, count);
     if(!chain) return 0;
-
-    uint32_t *root = (uint32_t *)(uintptr_t)read_u32(chain);
-    if(!root) return chain;
-    uint32_t *last = root;
-    for(uint32_t depth = 0; depth < 12u; depth++) {
-        uint32_t next = last[7];
-        if(!next) {
-            last[7] = (uint32_t)(uintptr_t)font_for_line_height(root[3]);
-            return chain;
-        }
-        last = (uint32_t *)(uintptr_t)next;
-    }
-    /* The authenticated chain has four entries. Preserve an unexpected longer
-       chain instead of truncating it at the safety bound. */
-    return chain;
+    return thai_chain_append(chain);
 }
