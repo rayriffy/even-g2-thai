@@ -362,6 +362,12 @@ def main() -> int:
         print(f"flash preflight blocked: {error}", file=sys.stderr)
         return 2
     if args.operation == "discover":
+        protected = json.loads(selection_record.read_text())
+        endpoints = protected["endpoints"]
+        environment = {
+            "LEFT_NAME": endpoints["left_name"],
+            "RIGHT_NAME": endpoints["right_name"],
+        }
         discovery = (
             "import asyncio\n"
             "from bleak import BleakScanner\n"
@@ -369,10 +375,15 @@ def main() -> int:
             "    devices = await BleakScanner.discover(timeout=20, return_adv=True)\n"
             "    for address, (device, advertisement) in devices.items():\n"
             "        name = advertisement.local_name or device.name or ''\n"
-            "        if 'G2_' in name: print(name, address)\n"
+            "        if name == __import__('os').environ['LEFT_NAME']: print('left', address)\n"
+            "        if name == __import__('os').environ['RIGHT_NAME']: print('right', address)\n"
             "asyncio.run(scan())\n"
         )
-        process = subprocess.run([str(interpreter), "-c", discovery], check=False)
+        process = subprocess.run(
+            [str(interpreter), "-c", discovery],
+            check=False,
+            env={**os.environ, **environment},
+        )
     else:
         try:
             verify_ble_endpoints(interpreter, forwarded, selection_record)
