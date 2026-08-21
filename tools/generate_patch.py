@@ -12,22 +12,22 @@ import sys
 import zlib
 from pathlib import Path
 
-STOCK_SHA256 = "f4dfb0b49ad3de3c2daf17f8a27a157c3dc98411d6a0d3ab2cfd0918f41b9afa"
+STOCK_SHA256 = "a03fbea9f68a9de6bc271daabb9f3a41c59053d1086622c76a4e990f829cc561"
 FONT_SHA256 = "5a1c559bb539583c8a1fd99d1c5b9491e5e14478c9cd2bd0970d5c3096cc9ef8"
 FONT_SOURCE_COMMIT = "e1118da94a8cb00cf6d06cdac9ef13eb1e5c6ab7"
 MAINAPP_SUFFIX = "ota/s200_firmware_ota.bin"
 APP_LOAD_ADDR = 0x00438000
 APP_PREAMBLE = 0x20
 APP_MAX_END = 0x007F0000
-G2_FILE_DELTA = 0x37A179
+G2_FILE_DELTA = 0x379BFE
 FONT_DSC_MAGIC = 0xA11D0001
 FONT_BITMAP_MAGIC = 0xA11D0002
 FONT_DATA_MAGIC = 0xA11D0003
 HOOK_SITES = {
-    0x0046D470: bytes.fromhex("ff f7 36 fb"),
-    0x0046D4CE: bytes.fromhex("ff f7 07 fb"),
+    0x00471318: bytes.fromhex("ff f7 36 fb"),
+    0x00471376: bytes.fromhex("ff f7 07 fb"),
 }
-TEXT_HELPER_SITE = (0x00489B3C, bytes.fromhex("2d e9 f0 41"))
+TEXT_HELPER_SITE = (0x00491BA4, bytes.fromhex("2d e9 f0 41"))
 
 
 def align_up(value: int, alignment: int = 4) -> int:
@@ -234,11 +234,12 @@ def build_spec(stock: bytes, font_blob: bytes, build: dict[str, object]) -> dict
 
     return {
         "schema_version": 1,
-        "base": "g2_2.2.6.10.bin",
+        "base": "g2_2.2.9.22.bin",
         "base_sha256": STOCK_SHA256,
         "output_sha256": hashlib.sha256(data).hexdigest(),
         "metadata": {
-            "target": "Even Realities G2 2.2.6.10",
+            "target": "Even Realities G2 2.2.9.22",
+            "component_count": struct.unpack_from("<I", stock, 8)[0],
             "lvgl": "9.3.0-dev",
             "hook_sites": [f"0x{address:08X}" for address in HOOK_SITES],
             "chain_wrapper_address": f"0x{chain_address:08X}",

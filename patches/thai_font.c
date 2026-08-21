@@ -1,4 +1,4 @@
-/* LVGL 9.3 Thai fallback for Even Realities G2 firmware 2.2.6.10. */
+/* LVGL 9.3 Thai fallback for Even Realities G2 firmware 2.2.9.22. */
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -14,8 +14,8 @@
 #define FONT_BITMAP_MAGIC 0xA11D0002u
 #define FONT_DATA_MAGIC 0xA11D0003u
 #define LV_FONT_GLYPH_FORMAT_A8 0x08u
-#define STOCK_CHAIN_BUILD_THUMB 0x0046CAE1u
-#define STOCK_UTF8_NEXT_THUMB 0x00489DBDu
+#define STOCK_CHAIN_BUILD_THUMB 0x00470989u
+#define STOCK_UTF8_NEXT_THUMB 0x00491E25u
 #define GLYPH_DSC_SIZE 32u
 #define GLYPH_DSC_FORMAT_OFFSET 14u
 #define GLYPH_DSC_GID_OFFSET 24u

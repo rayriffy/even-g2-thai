@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "target_version": "VERSION",
+  "stock_sha256": "STOCK_SHA256",
+  "stock_url": "https://cdn.example/firmware/FILE.bin",
+  "stock_size": 0,
+  "patched_sha256": "PATCHED_SHA256",
+  "component_count": null,
+  "archive_hardware_validated": false,
+  "selected_artifact": {
+    "source_url": null,
+    "sub_path": null,
+    "file_size": null,
+    "file_sign": null
+  },
+  "compatibility": {
+    "status": "unverified",
+    "hardware_revision": null,
+    "mode": null,
+    "region": null,
+    "type": null,
+    "selection_record_sha256": null,
+    "serial_redacted": true,
+    "source": null,
+    "verified_at": null,
+    "left_endpoint_name_sha256": null,
+    "right_endpoint_name_sha256": null
+  }
+}

@@ -2,6 +2,14 @@
 
 Flashing custom firmware can permanently brick either lens. Complete the
 offline build and keep the verified stock image before connecting.
+If this target version has not already been authenticated and rebased, stop and
+complete the [firmware discovery and rebase playbook](firmware-rebase.md)
+first.
+
+Current block: the [2.2.9.22 evidence record](rebases/2.2.9.22.md) does not yet
+authenticate the device-specific `mode`/`region`/`type` selection. Do not run
+the transport or flashing sections below until that compatibility gate is
+closed and recorded.
 
 ## 1. Build and verify
 
@@ -12,14 +20,35 @@ make check
 Keep both files:
 
 ```text
-.cache/g2_2.2.6.10.bin
-build/g2_2.2.6.10_thai.bin
+.cache/g2_2.2.9.22.bin
+build/g2_2.2.9.22_thai.bin
 ```
 
 ## 2. Prepare G2Flash
 
+These commands and the no-OTA stop boundary are reviewed against G2Flash
+commit `877c8d9490db0d3717ca012dd0f54556af3701bd`. Do not use another revision
+without re-reading its stage ordering and updating the playbook evidence.
+
 ```sh
+set -euo pipefail
 cd /Users/rayriffy/Git/g2flash
+G2FLASH_COMMIT=877c8d9490db0d3717ca012dd0f54556af3701bd
+g2flash_dirty="$(git status --porcelain --untracked-files=all | sed '/^?? \.DS_Store$/d')"
+test -z "$g2flash_dirty" || {
+  echo "G2Flash has local source changes; use a fresh clean checkout" >&2
+  exit 1
+}
+git checkout --detach "$G2FLASH_COMMIT"
+test "$(git rev-parse HEAD)" = "$G2FLASH_COMMIT" || {
+  echo "G2Flash checkout is not pinned to $G2FLASH_COMMIT" >&2
+  exit 1
+}
+g2flash_dirty="$(git status --porcelain --untracked-files=all | sed '/^?? \.DS_Store$/d')"
+test -z "$g2flash_dirty" || {
+  echo "G2Flash has local source changes; use a fresh clean checkout" >&2
+  exit 1
+}
 python3 -m venv venv
 ./venv/bin/python -m pip install --upgrade pip
 ./venv/bin/python -m pip install -r requirements.txt
@@ -37,22 +66,13 @@ the programmed OTA range. Leave the R1 paired. If an arm does not advertise,
 first close the Even app, disable the phone's Bluetooth, and wake the glasses;
 do not use a reset as the discovery fix.
 
-Find the CoreBluetooth UUID for each arm:
+UUID discovery is also gated because it touches the Bluetooth adapter. Run it
+only after the compatibility record is verified:
 
 ```sh
-./venv/bin/python - <<'PY'
-import asyncio
-from bleak import BleakScanner
-
-async def main():
-    devices = await BleakScanner.discover(timeout=20, return_adv=True)
-    for address, (device, advertisement) in devices.items():
-        name = advertisement.local_name or device.name or ""
-        if "G2_" in name:
-            print(name, address)
-
-asyncio.run(main())
-PY
+python3 tools/gated_g2flash.py --g2flash-root ../g2flash \
+  --operation discover \
+  --selection-record /secure/path/to/device-ota-info.json
 ```
 
 The names contain `_L_` and `_R_`; copy their corresponding UUIDs as
@@ -61,20 +81,27 @@ The names contain `_L_` and `_R_`; copy their corresponding UUIDs as
 
 ## 3. Prove transport without starting OTA
 
-Run from `/Users/rayriffy/Git/g2flash`:
+Run from `/Users/rayriffy/Git/g2-thai`. The launcher checks the redacted
+compatibility record, exact stock/patched hash, G2Flash commit and cleanliness,
+and its virtualenv before it can connect:
 
 ```sh
-./venv/bin/python g2flash.py \
+python3 tools/gated_g2flash.py --g2flash-root ../g2flash \
+  --operation transport \
+  --selection-record /secure/path/to/device-ota-info.json -- \
   -c 'g2://local?left=LEFT_UUID&right=RIGHT_UUID&addressType=random' \
-  -f /Users/rayriffy/Git/g2-thai/build/g2_2.2.6.10_thai.bin \
+  -f build/g2_2.2.9.22_thai.bin \
   --lens both \
   --stop-before file_check
 ```
 
 Type the warranty phrase when prompted. This gate connects and enables BLE
-notifications but stops before OTA BEGIN, FILE_CHECK, or firmware data. Do not
-use `--stop-before flash` as a no-write test: in the current G2Flash state
-machine it already sends OTA BEGIN and FILE_CHECK before stopping.
+notifications, including GATT/CCCD writes, but stops before OTA BEGIN,
+FILE_CHECK, or firmware data. It is a no-OTA gate, not a write-free device
+interaction. Do not use `--stop-before flash` as a no-OTA test: in the current
+G2Flash state machine it already sends OTA BEGIN and FILE_CHECK before stopping.
+This claim is version-specific to the pinned G2Flash commit above; verify the
+source again before changing that pin.
 
 Do not proceed unless both sides report discovery success and
 `stopping before FILE_CHECK`.
@@ -84,9 +111,11 @@ Do not proceed unless both sides report discovery success and
 Start with one lens so the other remains a working reference:
 
 ```sh
-./venv/bin/python g2flash.py \
+python3 tools/gated_g2flash.py --g2flash-root ../g2flash \
+  --operation flash \
+  --selection-record /secure/path/to/device-ota-info.json -- \
   -c 'g2://local?left=LEFT_UUID&right=RIGHT_UUID&addressType=random' \
-  -f /Users/rayriffy/Git/g2-thai/build/g2_2.2.6.10_thai.bin \
+  -f build/g2_2.2.9.22_thai.bin \
   --lens left
 ```
 
@@ -95,9 +124,11 @@ as `ภาษาไทย`, `กรุงเทพมหานคร`, `น้�
 nikhahit in `น้ำ` are separated. Then flash the right lens:
 
 ```sh
-./venv/bin/python g2flash.py \
+python3 tools/gated_g2flash.py --g2flash-root ../g2flash \
+  --operation flash \
+  --selection-record /secure/path/to/device-ota-info.json -- \
   -c 'g2://local?left=LEFT_UUID&right=RIGHT_UUID&addressType=random' \
-  -f /Users/rayriffy/Git/g2-thai/build/g2_2.2.6.10_thai.bin \
+  -f build/g2_2.2.9.22_thai.bin \
   --lens right
 ```
 
@@ -111,9 +142,11 @@ Flash the verified stock image with the same connection string, one lens at a
 time:
 
 ```sh
-./venv/bin/python g2flash.py \
+python3 tools/gated_g2flash.py --g2flash-root ../g2flash \
+  --operation rollback \
+  --selection-record /secure/path/to/device-ota-info.json -- \
   -c 'g2://local?left=LEFT_UUID&right=RIGHT_UUID&addressType=random' \
-  -f /Users/rayriffy/Git/g2-thai/.cache/g2_2.2.6.10.bin \
+  -f .cache/g2_2.2.9.22.bin \
   --lens left
 ```
 

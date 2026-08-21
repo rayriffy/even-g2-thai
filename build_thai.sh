@@ -3,16 +3,17 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 G2FLASH_ROOT="${G2FLASH_ROOT:-$ROOT/../g2flash}"
+G2FLASH_COMMIT="877c8d9490db0d3717ca012dd0f54556af3701bd"
 CACHE="$ROOT/.cache"
 BUILD="$ROOT/build"
-STOCK="$CACHE/g2_2.2.6.10.bin"
+STOCK="$CACHE/g2_2.2.9.22.bin"
 FONT="$CACHE/NotoSansThai-wdth-wght.ttf"
 FONT_BLOB="$BUILD/thai_font.bin"
 PATCH_SPEC="$ROOT/patches/thai_patches.json"
-OUTPUT="$BUILD/g2_2.2.6.10_thai.bin"
+OUTPUT="$BUILD/g2_2.2.9.22_thai.bin"
 
-FW_URL="https://cdn.evenreal.co/firmware/e28738432d7b612d625331b00383149b.bin"
-FW_SHA256="f4dfb0b49ad3de3c2daf17f8a27a157c3dc98411d6a0d3ab2cfd0918f41b9afa"
+FW_URL="https://cdn.evenreal.co/firmware/fc250b05e98a9ff998b4b68f5f99f994.bin"
+FW_SHA256="a03fbea9f68a9de6bc271daabb9f3a41c59053d1086622c76a4e990f829cc561"
 FONT_URL="https://raw.githubusercontent.com/google/fonts/e1118da94a8cb00cf6d06cdac9ef13eb1e5c6ab7/ofl/notosansthai/NotoSansThai%5Bwdth%2Cwght%5D.ttf"
 FONT_SHA256="5a1c559bb539583c8a1fd99d1c5b9491e5e14478c9cd2bd0970d5c3096cc9ef8"
 
@@ -38,14 +39,31 @@ fetch_verified() {
     echo "verified cached $label"
     return
   fi
+  if [[ -e "$path" ]]; then
+    echo "refusing to overwrite unverified $label at $path" >&2
+    echo "inspect it, then move it aside or trash it explicitly" >&2
+    return 1
+  fi
+  local candidate
+  candidate="$(mktemp "${path}.candidate.XXXXXX")"
   echo "downloading $label"
-  curl --fail --location --retry 3 --progress-bar --output "$path" "$url"
+  if ! curl --fail --location --retry 3 --progress-bar --output "$candidate" "$url"; then
+    echo "$label download failed; incomplete candidate retained at $candidate" >&2
+    return 1
+  fi
   local actual
-  actual="$(sha256_file "$path")"
+  actual="$(sha256_file "$candidate")"
   [[ "$actual" == "$expected" ]] || {
     echo "$label SHA-256 mismatch: expected $expected, got $actual" >&2
-    exit 1
+    echo "unverified candidate retained at $candidate" >&2
+    return 1
   }
+  if ! ln "$candidate" "$path"; then
+    echo "refusing to publish $label; $path already exists or linking failed" >&2
+    echo "verified candidate retained at $candidate" >&2
+    return 1
+  fi
+  echo "published $label; verified candidate retained at $candidate"
 }
 
 mkdir -p "$CACHE" "$BUILD"
@@ -53,8 +71,17 @@ mkdir -p "$CACHE" "$BUILD"
   echo "g2flash not found at $G2FLASH_ROOT (set G2FLASH_ROOT)" >&2
   exit 1
 }
+[[ "$(git -C "$G2FLASH_ROOT" rev-parse HEAD)" == "$G2FLASH_COMMIT" ]] || {
+  echo "g2flash must be pinned to $G2FLASH_COMMIT" >&2
+  exit 1
+}
+g2flash_dirty="$(git -C "$G2FLASH_ROOT" status --porcelain --untracked-files=all | sed '/^?? \.DS_Store$/d')"
+[[ -z "$g2flash_dirty" ]] || {
+  echo "g2flash has local source changes; use a fresh clean checkout" >&2
+  exit 1
+}
 
-fetch_verified "$FW_URL" "$STOCK" "$FW_SHA256" "stock G2 2.2.6.10 firmware"
+fetch_verified "$FW_URL" "$STOCK" "$FW_SHA256" "stock G2 2.2.9.22 firmware"
 
 if [[ "$UPDATE_PATCHES" -eq 1 ]]; then
   fetch_verified "$FONT_URL" "$FONT" "$FONT_SHA256" "pinned Noto Sans Thai"

@@ -1,18 +1,30 @@
 # Thai rendering patch research
 
+For the version-independent OTA discovery, app-analysis, binary relocation,
+and verification procedure, read the
+[firmware discovery and rebase playbook](firmware-rebase.md).
+
 ## Stock boundary
 
-The authenticated G2 2.2.6.10 Apollo image uses LVGL 9.3.0-dev and FreeType
+The authenticated G2 2.2.9.22 Apollo image uses LVGL 9.3.0-dev and FreeType
 2.9.1. The first-party font manager builds two four-entry fallback chains:
 background and foreground. Their external XIP headers live at `0x80100000` and
 `0x80700000`; those font payloads are not present in the downloadable Apollo
 main image.
 
-The stock chain builder is at `0x0046CAE0`. Font-manager initialization calls
+The rebase uses the vendor bundle with SHA-256
+`a03fbea9f68a9de6bc271daabb9f3a41c59053d1086622c76a4e990f829cc561`.
+Its main payload begins at OTA offset `0x000BE3E2`, is `0x00386A84` bytes, and
+maps through file delta `0x00379BFE`. None of the earlier addresses were
+carried forward by assumption: exact binary anchors uniquely relocated every
+dependency below, and the decoded Thumb-2 branches at both hook sites still
+target the relocated stock chain builder.
+
+The stock chain builder is at `0x00470988`. Font-manager initialization calls
 it at:
 
-- `0x0046D470`, stock bytes `ff f7 36 fb`
-- `0x0046D4CE`, stock bytes `ff f7 07 fb`
+- `0x00471318`, stock bytes `ff f7 36 fb`
+- `0x00471376`, stock bytes `ff f7 07 fb`
 
 The patch redirects only those two calls to `thai_chain_build`. The wrapper
 calls the stock builder, walks the completed `lv_font_t.fallback` chain, and
@@ -20,9 +32,9 @@ attaches a read-only Thai fallback to the final font. The `lv_font_t` layout is
 the exact 32-bit LVGL 9.3 layout; `fallback` is at offset `0x1C`.
 
 The IAR target uses short enums. Authenticated stock `lv_font_get_glyph_dsc`
-at `0x004D56C0` clears exactly `0x20` bytes, writes the one-byte glyph format at
+at `0x004E64FC` clears exactly `0x20` bytes, writes the one-byte glyph format at
 offset `0x0E`, and uses offset `0x0F` for `is_placeholder`. Stock
-`lv_font_glyph_release_draw_data` at `0x004D5664` reads the cache-entry pointer
+`lv_font_glyph_release_draw_data` at `0x004E64A0` reads the cache-entry pointer
 at offset `0x1C`; therefore `gid.index` is at `0x18`. The injected callback
 uses those IAR offsets rather than Clang's default enum ABI.
 
@@ -56,11 +68,12 @@ marks. See the [Unicode Thai combining-mark rule](https://www.unicode.org/versio
 and [Microsoft's Thai OpenType model](https://learn.microsoft.com/en-us/typography/script-development/thai).
 
 The stock rendering-only helper `lv_text_encoded_letter_next_2` is at
-`0x00489B3C`; its authenticated first four bytes are `2d e9 f0 41`. Its four
-callers are label drawing, text width, width-with-flags, and text size. The
+`0x00491BA4`; its authenticated first four bytes are `2d e9 f0 41`. Five direct
+call sites cover label drawing and text measurement paths. The
 patch replaces its entry with a `B.W` to a wrapper that maps a tone mark whose
 next character is SARA AM to `U+F700..U+F703`. Text storage and the global UTF-8
-decoder remain untouched.
+decoder remain untouched. The wrapper delegates normal decoding to the
+relocated stock UTF-8 helper at `0x00491E24`.
 
 Each PUA record reuses the original tone bitmap and raises only its `ofs_y`.
 The generator computes the smallest per-size displacement that makes all A4

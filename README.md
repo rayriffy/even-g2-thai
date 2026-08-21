@@ -1,6 +1,6 @@
 # g2-thai
 
-`g2-thai` patches the Even Realities G2 2.2.6.10 firmware with a Thai bitmap
+`g2-thai` patches the Even Realities G2 2.2.9.22 firmware with a Thai bitmap
 fallback font. It keeps the stock LVGL/FreeType font chains for every existing
 glyph and adds Thai only when the stock fonts report a miss.
 
@@ -9,7 +9,7 @@ vendor image from Even's CDN, verifies its SHA-256, applies a committed binary
 patch, verifies every EVENOTA checksum, and writes:
 
 ```text
-build/g2_2.2.6.10_thai.bin
+build/g2_2.2.9.22_thai.bin
 ```
 
 ## Build
@@ -17,11 +17,20 @@ build/g2_2.2.6.10_thai.bin
 Clone `g2flash` beside this repository, then run:
 
 ```sh
+set -euo pipefail
+g2flash_dirty="$(git -C ../g2flash status --porcelain --untracked-files=all | sed '/^?? \.DS_Store$/d')"
+test -z "$g2flash_dirty"
+git -C ../g2flash checkout --detach 877c8d9490db0d3717ca012dd0f54556af3701bd
+test "$(git -C ../g2flash rev-parse HEAD)" = 877c8d9490db0d3717ca012dd0f54556af3701bd
+g2flash_dirty="$(git -C ../g2flash status --porcelain --untracked-files=all | sed '/^?? \.DS_Store$/d')"
+test -z "$g2flash_dirty"
 make build
 ```
 
 `g2flash` supplies the reviewed Thumb-2 compiler helper and the BLE flashing
-tool. Set `G2FLASH_ROOT=/path/to/g2flash` if it is elsewhere.
+tool. Set `G2FLASH_ROOT=/path/to/g2flash` if it is elsewhere. The pinned commit
+also fixes the stage ordering assumed by the no-OTA transport gate in the
+flashing guide.
 
 To regenerate the font payload and committed patch after source changes:
 
@@ -36,7 +45,15 @@ same packed glyph payload and positioning logic used by the firmware callback.
 
 Noto Sans Thai is fetched from a pinned Google Fonts commit and verified before
 use. Its generated bitmap data remains covered by the SIL Open Font License in
-[`third_party/NotoSansThai-OFL.txt`](third-party/NotoSansThai-OFL.txt).
+[`third_party/NotoSansThai-OFL.txt`](third_party/NotoSansThai-OFL.txt).
+
+## Firmware updates and rebasing
+
+When the installed glasses version changes, follow the complete
+[`docs/firmware-rebase.md`](docs/firmware-rebase.md) playbook before rebuilding
+or flashing. It covers official OTA discovery, APK/API analysis, address
+relocation, checksum and MRAM gates, rollback evidence, and worked versioned
+rebase records.
 
 ## Scope and current boundary
 
