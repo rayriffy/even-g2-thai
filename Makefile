@@ -1,4 +1,4 @@
-.PHONY: build patch test check webflasher
+.PHONY: build patch test check webflasher webflasher-serve
 
 build:
 	./build_thai.sh
@@ -22,4 +22,10 @@ webflasher:
 	  echo "applied patches/webflasher_case_usb_thai.patch"; \
 	fi
 	python3 tools/check_webflasher_pin.py
+
+webflasher-serve: webflasher
+	cd third_party/evenRealities-webflasher && \
+	if command -v bun >/dev/null 2>&1; then bun run hardware; \
+	elif command -v npm >/dev/null 2>&1; then npm run hardware; \
+	else echo "need bun or npm on PATH" >&2; exit 1; fi
 
