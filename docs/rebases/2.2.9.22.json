@@ -4,7 +4,7 @@
   "stock_sha256": "a03fbea9f68a9de6bc271daabb9f3a41c59053d1086622c76a4e990f829cc561",
   "stock_url": "https://cdn.evenreal.co/firmware/fc250b05e98a9ff998b4b68f5f99f994.bin",
   "stock_size": 4476518,
-  "patched_sha256": "cb72eed63a889d304eb4f327e31bc76362d9b55ffb59f10cb264ce7daccb4150",
+  "patched_sha256": "714722cb65f4ef008f8e76d1616da9840f07b0c1dff4bbfbc57a2e7982a679a1",
   "component_count": 6,
   "archive_hardware_validated": false,
   "selected_artifact": {

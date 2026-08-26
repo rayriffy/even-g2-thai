@@ -16,9 +16,13 @@ MAGIC = 0x49414854  # "THAI" in little endian
 VERSION = 2
 PILLOW_VERSION = "11.3.0"
 SIZES = (16, 20, 24, 28, 32, 36, 40, 48)
+RASTER_SCALE = 2
 THAI_START = 0x0E00
 THAI_COUNT = 0x80
 ALT_START = 0xF700
+SARA_AA = 0x0E32
+SARA_AM = 0x0E33
+NIKHAHIT = 0x0E4D
 TONE_MARKS = (0x0E48, 0x0E49, 0x0E4A, 0x0E4B)
 COMBINING_MARKS = frozenset(
     [0x0E31, *range(0x0E34, 0x0E3B), 0x0E47, *range(0x0E48, 0x0E4F)]
@@ -95,6 +99,43 @@ def _shaped_combining_mark(
     )
 
 
+def _synthetic_sara_am(
+    font: ImageFont.FreeTypeFont, base_cell: int
+) -> tuple[bytes, int, int, int, int, int]:
+    nikhahit, nikhahit_width, nikhahit_height, nikhahit_left, nikhahit_top = (
+        _shaped_combining_mark(font, NIKHAHIT, base_cell)
+    )
+    sara_aa, (sara_aa_left, sara_aa_top) = font.getmask2(
+        chr(SARA_AA), mode="L", anchor="ls"
+    )
+    sara_aa_width, sara_aa_height = sara_aa.size
+    left = min(nikhahit_left, sara_aa_left)
+    top = min(nikhahit_top, sara_aa_top)
+    right = max(nikhahit_left + nikhahit_width, sara_aa_left + sara_aa_width)
+    bottom = max(nikhahit_top + nikhahit_height, sara_aa_top + sara_aa_height)
+    width, height = right - left, bottom - top
+    pixels = bytearray(width * height)
+    for source, source_width, source_height, source_left, source_top in (
+        (nikhahit, nikhahit_width, nikhahit_height, nikhahit_left, nikhahit_top),
+        (bytes(sara_aa), sara_aa_width, sara_aa_height, sara_aa_left, sara_aa_top),
+    ):
+        for y in range(source_height):
+            target_offset = (source_top - top + y) * width + source_left - left
+            source_offset = y * source_width
+            for x in range(source_width):
+                pixels[target_offset + x] = max(
+                    pixels[target_offset + x], source[source_offset + x]
+                )
+    return (
+        bytes(pixels),
+        width,
+        height,
+        left,
+        top,
+        round(font.getlength(chr(SARA_AA))),
+    )
+
+
 def _pack_a4(mask: object, width: int, height: int) -> tuple[bytes, int]:
     pixels = bytes(mask)
     row_bytes = (width + 1) // 2
@@ -125,7 +166,8 @@ def build_blob(font_path: Path) -> tuple[bytes, dict[str, object]]:
     bitmap_offset = records_offset + RECORD.size * len(SIZES) * GLYPH_COUNT
 
     for size in SIZES:
-        font = _font(font_path, size)
+        raster_size = size * RASTER_SCALE
+        font = _font(font_path, raster_size)
         ascent, descent = font.getmetrics()
         base_cell = round(font.getlength("ก"))
         records: list[tuple[int, int, int, int, int, int, int, int]] = []
@@ -139,7 +181,11 @@ def build_blob(font_path: Path) -> tuple[bytes, dict[str, object]]:
                 records.append((0, 0, 0, 0, 0, 0, 0, 0))
                 continue
 
-            if codepoint in COMBINING_MARKS:
+            if codepoint == SARA_AM:
+                mask, width, height, left, top, advance = _synthetic_sara_am(
+                    font, base_cell
+                )
+            elif codepoint in COMBINING_MARKS:
                 mask, width, height, left, top = _shaped_combining_mark(
                     font, codepoint, base_cell
                 )
@@ -214,8 +260,13 @@ def build_blob(font_path: Path) -> tuple[bytes, dict[str, object]]:
         "font_sha256": hashlib.sha256(font_path.read_bytes()).hexdigest(),
         "blob_sha256": hashlib.sha256(output).hexdigest(),
         "blob_bytes": len(output),
-        "sizes": [
-            {"pixel_size": row[0], "line_height": row[1], "base_line": row[2]}
+            "sizes": [
+            {
+                "target_pixel_size": row[0],
+                "raster_pixel_size": row[0] * RASTER_SCALE,
+                "line_height": row[1],
+                "base_line": row[2],
+            }
             for row in size_rows
         ],
         "covered_codepoints": len(VALID_CODEPOINTS),

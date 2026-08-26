@@ -45,7 +45,11 @@ paths cannot be recovered from the OTA alone. Replacing them would require a
 separate font-bank update protocol. Appending a fallback to the Apollo main app
 is smaller and preserves stock glyph selection.
 
-The fallback stores Noto Sans Thai alpha masks at eight sizes. Its callbacks
+The fallback stores `2005_iannnnnAMD` alpha masks at eight stock target sizes,
+rasterized at 2× source resolution because this font's Thai glyph design is
+visually about half the requested pixel size. Host-side Raqm shaping extracts
+combining marks without the font's dotted-circle scaffolds and synthesizes
+U+0E33 SARA AM from shaped U+0E4D nikhahit plus U+0E32 sara aa. Its callbacks
 return LVGL 9.3 glyph descriptors and expand packed A4 pixels into LVGL's A8
 draw buffer. The callback invokes the active draw-buffer handler's cache flush,
 matching LVGL's built-in bitmap-font path.
@@ -53,8 +57,8 @@ matching LVGL's built-in bitmap-font path.
 ## Thai shaping boundary
 
 LVGL decodes UTF-8 and supports font fallback, but it does not provide general
-Thai OpenType shaping. The patch retains zero advances and FreeType bearings for
-combining marks, which makes Thai readable, but it does not execute GPOS
+Thai OpenType shaping. The build pre-bakes the required mark anchors, SARA AM,
+and raised tone variants into bitmap records; firmware does not execute GPOS
 mark-to-base/mark-to-mark tables. Device testing must include stacked vowel and
 tone-mark sequences, not only consonants.
 

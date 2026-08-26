@@ -106,6 +106,22 @@ class ThaiPatchTests(unittest.TestCase):
         self.assertEqual(shaped, [0x0E19, ALT_START + 1, 0x0E33])
         self.assertEqual(shape_for_preview("น้า"), [0x0E19, 0x0E49, 0x0E32])
 
+    def test_sara_am_includes_nikhahit_above_sara_aa(self) -> None:
+        _, _, sizes, glyphs, _, records_offset = HEADER.unpack_from(self.font_blob)
+        sara_aa_index = 0x0E32 - 0x0E00
+        sara_am_index = 0x0E33 - 0x0E00
+        for size_index in range(sizes):
+            row = records_offset + size_index * glyphs * RECORD.size
+            sara_aa = RECORD.unpack_from(self.font_blob, row + sara_aa_index * RECORD.size)
+            sara_am = RECORD.unpack_from(self.font_blob, row + sara_am_index * RECORD.size)
+            sara_aa_pixels = self._glyph_pixels(sara_aa)
+            sara_am_pixels = self._glyph_pixels(sara_am)
+            self.assertEqual(sara_am[1], sara_aa[1])
+            self.assertLess(
+                min(y for _, y in sara_am_pixels),
+                min(y for _, y in sara_aa_pixels),
+            )
+
     def test_combining_tone_mark_has_zero_advance(self) -> None:
         _, _, _, glyphs, _, records_offset = HEADER.unpack_from(self.font_blob)
         tone_index = 0x0E48 - 0x0E00
@@ -131,6 +147,16 @@ class ThaiPatchTests(unittest.TestCase):
                 mark_left = base[1] + record[4]
                 self.assertLess(mark_left, base[1])
                 self.assertGreater(mark_left + record[2], 0)
+
+    def test_thai_base_glyph_uses_at_least_half_the_target_height(self) -> None:
+        _, _, sizes, glyphs, _, records_offset = HEADER.unpack_from(self.font_blob)
+        target_sizes = (16, 20, 24, 28, 32, 36, 40, 48)
+        self.assertEqual(sizes, len(target_sizes))
+        base_index = 0x0E01 - 0x0E00
+        for size_index, target_size in enumerate(target_sizes):
+            row = records_offset + size_index * glyphs * RECORD.size
+            record = RECORD.unpack_from(self.font_blob, row + base_index * RECORD.size)
+            self.assertGreaterEqual(record[3], target_size // 2)
 
     def test_all_rasterized_glyphs_fit_their_declared_line_box(self) -> None:
         _, _, sizes, glyphs, _, records_offset = HEADER.unpack_from(self.font_blob)
