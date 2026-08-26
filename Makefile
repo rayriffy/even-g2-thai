@@ -25,7 +25,7 @@ webflasher:
 
 webflasher-serve: webflasher
 	cd third_party/evenRealities-webflasher && \
+	if command -v npm >/dev/null 2>&1; then npm ci; \
+	else echo "need npm on PATH to install the package-lock-pinned WebFlasher dependencies" >&2; exit 1; fi && \
 	if command -v bun >/dev/null 2>&1; then bun run hardware; \
-	elif command -v npm >/dev/null 2>&1; then npm run hardware; \
-	else echo "need bun or npm on PATH" >&2; exit 1; fi
-
+	else npm run hardware; fi

@@ -121,7 +121,9 @@ and checks the exact-hash pin against the built artifact. A personal checkout
 at `/Users/rayriffy/Git/evenRealities-webflasher` with the same local changes
 works identically.
 
-1. Build the artifact (`make check`), then `make webflasher`. When the hashes
+1. Build the artifact (`make check`), then `make webflasher-serve`. It installs
+   the committed WebFlasher dependencies with `npm ci` before starting Vite,
+   so a fresh checkout does not fail with `vite: command not found`. When the hashes
    change, regenerate the pin by updating the copy of
    `src/lib/localTempleFlashTargets.js` inside the patch
    (`patches/webflasher_case_usb_thai.patch`) with the new whole-bundle and

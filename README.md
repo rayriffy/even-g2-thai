@@ -67,12 +67,15 @@ flashing stays rejected.
 
 ```sh
 make webflasher
+make webflasher-serve
 ```
 
 The target initializes the submodule, applies the patch idempotently, and
 verifies that the writer pin matches the built artifact's bundle and main
-payload hashes. Run the vendored project's own tests and production build
-inside the submodule before touching hardware.
+payload hashes. `make webflasher-serve` installs the committed WebFlasher
+dependencies with `npm ci` before starting Vite, so a fresh checkout does not
+fail with `vite: command not found`. Run the vendored project's own tests and
+production build inside the submodule before touching hardware.
 
 ## Scope and current boundary
 
