@@ -12,18 +12,5 @@
     "sub_path": "firmware/d495a1dffb919795e95135e144345f04.bin",
     "file_size": 4342507,
     "file_sign": null
-  },
-  "compatibility": {
-    "status": "unverified",
-    "hardware_revision": null,
-    "mode": null,
-    "region": null,
-    "type": null,
-    "selection_record_sha256": null,
-    "serial_redacted": true,
-    "source": null,
-    "verified_at": null,
-    "left_endpoint_name_sha256": null,
-    "right_endpoint_name_sha256": null
   }
 }

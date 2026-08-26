@@ -27,10 +27,9 @@ test -z "$g2flash_dirty"
 make build
 ```
 
-`g2flash` supplies the reviewed Thumb-2 compiler helper and the BLE flashing
-tool. Set `G2FLASH_ROOT=/path/to/g2flash` if it is elsewhere. The pinned commit
-also fixes the stage ordering assumed by the no-OTA transport gate in the
-flashing guide.
+`g2flash` supplies the reviewed Thumb-2 compiler helper. Set
+`G2FLASH_ROOT=/path/to/g2flash` if it is elsewhere. Firmware writes use the
+vendored WebFlasher Case-USB route documented in [`docs/flashing.md`](docs/flashing.md).
 
 To regenerate the font payload and committed patch after source changes:
 
@@ -43,9 +42,15 @@ make check
 Patch regeneration also writes `build/thai-preview.png`, rendered from the
 same packed glyph payload and positioning logic used by the firmware callback.
 
-Noto Sans Thai is fetched from a pinned Google Fonts commit and verified before
-use. Its generated bitmap data remains covered by the SIL Open Font License in
-[`third_party/NotoSansThai-OFL.txt`](third_party/NotoSansThai-OFL.txt).
+The Thai source font is the user-supplied
+[`third_party/2005_iannnnnAMD.ttf`](third_party/2005_iannnnnAMD.ttf), verified
+by SHA-256 before patch regeneration. Its embedded copyright is "All rights
+reserved" and it exposes no license field. Its inclusion in this repository is
+user-authorized for CI reproduction; do not reuse or redistribute it outside
+this project without the font holder's permission. Regeneration requires Pillow
+with Raqm: it extracts each combining mark from a shaped `ก + mark` raster,
+removing the font's dotted-circle teaching scaffold before embedding the
+fallback glyph.
 
 ## Firmware updates and rebasing
 

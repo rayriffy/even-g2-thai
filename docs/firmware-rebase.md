@@ -34,8 +34,8 @@ This offline procedure cannot prove physical boot or rendering.
 - [`g2-thai`](../README.md): Thai font source, patch generator, committed patch
   specification, tests, and this playbook.
 - [`g2flash`](https://github.com/jimrandomh/g2flash): EVENOTA parser,
-  checksum/MRAM validation, compiler helper, and BLE transport. The reviewed
-  revision for this playbook is
+  checksum/MRAM validation, and compiler helper. The reviewed revision for this
+  playbook is
   `877c8d9490db0d3717ca012dd0f54556af3701bd`.
 - [`evenRealities-openCFW`](https://github.com/kalanihelekunihi/evenRealities-openCFW):
   broader G2 firmware research and source reconstruction.
@@ -61,15 +61,10 @@ building a custom image. The stock base must match the version that will receive
 the patch; a similar version string is not sufficient.
 
 A matching version is necessary but not sufficient when multiple hardware,
-region, or release modes may exist. Preserve the complete `DeviceOtaInfo`
-record selected for the owned device, including `sn`, `mode`, `region`, and
-`type`, and compare it with the recorded hardware/app context. Do not guess the
-meaning of an unknown field. If the authenticated selection record is
-unavailable, mark variant compatibility unverified and block physical flashing.
-Keep the full record in protected local evidence; redact serials and tokens from
-committed notes. Close the gate only with the owned device's authenticated
-selection or authoritative evidence that the bundle is universal for that
-hardware revision.
+region, or release modes may exist. Preserve available `DeviceOtaInfo` metadata
+as private provenance and never guess unknown fields. It can help authenticate
+the stock bundle, but it is not a flashing gate: the Case-USB writer accepts
+only the committed exact whole-bundle and Apollo-main hashes.
 
 The phone app version and glasses firmware version are separate namespaces. In
 the worked example, Android app `2.2.8` build `122` reported glasses firmware
@@ -468,25 +463,13 @@ static evidence. Verify every reported finding against the real binary.
 ## Phase 8: physical test and rollback boundary
 
 Only after all offline gates pass, follow [`flashing.md`](flashing.md).
-Do not proceed while the versioned evidence record marks hardware/region/mode
-selection as unverified.
 
-Every BLE command must use `tools/gated_g2flash.py`, never `g2flash.py`
-directly. The launcher verifies compatibility, protected record, artifact,
-G2Flash state, dependencies, operation, lens, and stop stage before connection;
-only exact `g2://local` parameters are allowed, warranty bypass is forbidden,
-and unreviewed, abbreviated, repeated, or overriding options fail closed.
-For flash/rollback, it also scans the supplied UUIDs and requires exact
-left/right advertised names and recorded target-version evidence.
+Case-USB WebFlasher is the only supported writer. `g2flash` remains a pinned
+compiler helper; direct BLE transport, discovery, flashing, and rollback are
+retired from this project.
 
 - Keep both the stock and patched images.
-- Do not factory-reset or forget/unpair the glasses merely to make them
-  advertise. Close the Even app and temporarily disable phone Bluetooth.
-- Leave the R1 ring paired.
-- Use `--stop-before file_check` for the no-OTA transport gate. In the current
-  G2Flash state machine, `--stop-before flash` is too late: OTA BEGIN and
-  FILE_CHECK have already been sent. The no-OTA gate still performs BLE GATT
-  and CCCD writes to enable notifications.
+- Do not factory-reset or forget/unpair the glasses or R1 ring.
 - Flash one temple first while the other remains a working reference.
 - Verify ordinary stock screens before Thai strings.
 - Test `ภาษาไทย`, `กรุงเทพมหานคร`, `น้ำ`, and `เก่ง`.
@@ -501,6 +484,5 @@ left/right advertised names and recorded target-version evidence.
 ## Evidence record template for the next version
 
 Copy [`rebases/TEMPLATE.md`](rebases/TEMPLATE.md) and
-[`rebases/TEMPLATE.json`](rebases/TEMPLATE.json) before editing code. The JSON
-record remains `unverified` until redacted device-selection evidence closes the
-hardware compatibility gate.
+[`rebases/TEMPLATE.json`](rebases/TEMPLATE.json) before editing code. Record
+the Case-USB writer pin and physical-test evidence alongside the artifact.

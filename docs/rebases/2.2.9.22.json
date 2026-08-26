@@ -4,7 +4,7 @@
   "stock_sha256": "a03fbea9f68a9de6bc271daabb9f3a41c59053d1086622c76a4e990f829cc561",
   "stock_url": "https://cdn.evenreal.co/firmware/fc250b05e98a9ff998b4b68f5f99f994.bin",
   "stock_size": 4476518,
-  "patched_sha256": "6316fb5d83200e73c7f34863aa082b050dfbaad7aaafa9139dce5de577cf9731",
+  "patched_sha256": "cb72eed63a889d304eb4f327e31bc76362d9b55ffb59f10cb264ce7daccb4150",
   "component_count": 6,
   "archive_hardware_validated": false,
   "selected_artifact": {
@@ -12,18 +12,5 @@
     "sub_path": "firmware/fc250b05e98a9ff998b4b68f5f99f994.bin",
     "file_size": 4476518,
     "file_sign": null
-  },
-  "compatibility": {
-    "status": "unverified",
-    "hardware_revision": null,
-    "mode": null,
-    "region": null,
-    "type": null,
-    "selection_record_sha256": null,
-    "serial_redacted": true,
-    "source": null,
-    "verified_at": null,
-    "left_endpoint_name_sha256": null,
-    "right_endpoint_name_sha256": null
   }
 }

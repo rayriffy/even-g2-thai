@@ -1,198 +1,74 @@
 # Flashing and rollback
 
-Flashing custom firmware can permanently brick either lens. Complete the
-offline build and keep the verified stock image before connecting.
-If this target version has not already been authenticated and rebased, stop and
-complete the [firmware discovery and rebase playbook](firmware-rebase.md)
-first.
-
-Current block: the [2.2.9.22 evidence record](rebases/2.2.9.22.md) does not yet
-authenticate the device-specific `mode`/`region`/`type` selection. Do not run
-the transport or flashing sections below until that compatibility gate is
-closed and recorded.
+This project writes firmware only through the vendored WebFlasher Case-USB
+route. Do not use `g2flash.py`, direct BLE flashing, or an automatic stock
+recovery panel for the Thai artifact.
 
 ## 1. Build and verify
 
 ```sh
-make check
+cd /Users/rayriffy/Git/g2-thai
+PATH="$PWD/.venv/bin:$PATH" make check
+make webflasher
 ```
 
-Keep both files:
+Keep both images:
 
 ```text
 .cache/g2_2.2.9.22.bin
 build/g2_2.2.9.22_thai.bin
 ```
 
-## 2. Prepare G2Flash
+`make webflasher` verifies that the exact whole-bundle and Apollo-main hashes
+are present in the Case-USB writer. A mismatched file cannot be selected for a
+write.
 
-These commands and the no-OTA stop boundary are reviewed against G2Flash
-commit `877c8d9490db0d3717ca012dd0f54556af3701bd`. Do not use another revision
-without re-reading its stage ordering and updating the playbook evidence.
-
-```sh
-set -euo pipefail
-cd /Users/rayriffy/Git/g2flash
-G2FLASH_COMMIT=877c8d9490db0d3717ca012dd0f54556af3701bd
-g2flash_dirty="$(git status --porcelain --untracked-files=all | sed '/^?? \.DS_Store$/d')"
-test -z "$g2flash_dirty" || {
-  echo "G2Flash has local source changes; use a fresh clean checkout" >&2
-  exit 1
-}
-git checkout --detach "$G2FLASH_COMMIT"
-test "$(git rev-parse HEAD)" = "$G2FLASH_COMMIT" || {
-  echo "G2Flash checkout is not pinned to $G2FLASH_COMMIT" >&2
-  exit 1
-}
-g2flash_dirty="$(git status --porcelain --untracked-files=all | sed '/^?? \.DS_Store$/d')"
-test -z "$g2flash_dirty" || {
-  echo "G2Flash has local source changes; use a fresh clean checkout" >&2
-  exit 1
-}
-python3 -m venv venv
-./venv/bin/python -m pip install --upgrade pip
-./venv/bin/python -m pip install -r requirements.txt
-```
-
-Charge both arms and the Mac. Quit the Even app and disable Bluetooth on the
-paired phone so both arms advertise. Keep the Mac awake throughout the flash.
-The first scan from Terminal will request macOS Bluetooth permission.
-
-Do **not** factory-reset the glasses, forget/unpair them from the phone, or
-remove the R1 ring pairing before flashing. G2Flash needs the phone connection
-to be temporarily inactive, not deleted. The patched main app ends below
-`0x007F0000`; persistent Cordio pairing records begin at `0x007FF000`, outside
-the programmed OTA range. Leave the R1 paired. If an arm does not advertise,
-first close the Even app, disable the phone's Bluetooth, and wake the glasses;
-do not use a reset as the discovery fix.
-
-UUID discovery is also gated because it touches the Bluetooth adapter. Run it
-only after the compatibility record is verified:
+## 2. Prepare the Case-USB writer
 
 ```sh
-python3 tools/gated_g2flash.py --g2flash-root ../g2flash \
-  --operation discover
+make webflasher-serve
 ```
 
-The names contain `_L_` and `_R_`; copy their corresponding UUIDs as
-`LEFT_UUID` and `RIGHT_UUID`. The current G2Flash parser requires both values;
-`g2://local` alone is not accepted.
+This initializes the pinned WebFlasher submodule, applies the local Thai pin,
+installs its `package-lock.json` dependencies, and serves
+`http://127.0.0.1:3000`.
 
-## 3. Prove transport without starting OTA
+Charge the Case and Mac, connect the Case with a USB-C data cable, and seat
+both temples. Keep the Case, cable, temples, and browser tab still throughout
+the operation. Do not factory-reset or unpair the glasses or R1 ring.
 
-Run from `/Users/rayriffy/Git/g2-thai`. The launcher checks the redacted
-compatibility record, exact stock/patched hash, G2Flash commit and cleanliness,
-and its virtualenv before it can connect:
+## 3. Flash one lens first
 
-```sh
-python3 tools/gated_g2flash.py --g2flash-root ../g2flash \
-  --operation transport \
-  --selection-record /secure/path/to/device-ota-info.json -- \
-  -c 'g2://local?left=LEFT_UUID&right=RIGHT_UUID&addressType=random' \
-  -f build/g2_2.2.9.22_thai.bin \
-  --lens both \
-  --stop-before file_check
+In WebFlasher, choose the local `build/g2_2.2.9.22_thai.bin` file. It must
+show **Validated locally** and the exact Thai Case-USB-only pin.
+
+Open **Advanced Mode → Recovery Console → Running-temple recovery through the
+Case**. Never use **Recover with update over USB**: that automatic panel selects
+the official stock catalog image.
+
+Choose one temple, confirm it is seated, acknowledge the single-slot risk, and
+type `FLASH GLASSES FIRMWARE`. Keep the write button as an explicit operator
+action.
+
+After a successful audit, confirm the Even app reconnects, double-tap the
+dimple repeatedly to prove the dashboard does not reboot, then test:
+
+```text
+ภาษาไทย
+กรุงเทพมหานคร
+น้ำ
+เก่ง
 ```
 
-Type the warranty phrase when prompted. This gate connects and enables BLE
-notifications, including GATT/CCCD writes, but stops before OTA BEGIN,
-FILE_CHECK, or firmware data. It is a no-OTA gate, not a write-free device
-interaction. Do not use `--stop-before flash` as a no-OTA test: in the current
-G2Flash state machine it already sends OTA BEGIN and FILE_CHECK before stopping.
-This claim is version-specific to the pinned G2Flash commit above; verify the
-source again before changing that pin.
-
-Do not proceed unless both sides report discovery success and
-`stopping before FILE_CHECK`.
-
-## 4. Flash explicitly
-
-### 4a. Charging-case USB route (used for all hardware flashes so far)
-
-The BLE path below stays gated: the protected `device-ota-info.json` selection
-record was never captured, so the compatibility record remains `unverified` and
-`gated_g2flash.py` intentionally blocks transport and flash. The working route
-is AM-Guru's `evenRealities-webflasher` Case-USB writer (Mac USB-C → case
-CH341 serial → temporary case SRAM bridge → pogo contacts → seated temple).
-This repository vendors it: `make webflasher` clones the submodule at pinned
-upstream commit `c437fdf`, applies
-[`patches/webflasher_case_usb_thai.patch`](../patches/webflasher_case_usb_thai.patch),
-and checks the exact-hash pin against the built artifact. A personal checkout
-at `/Users/rayriffy/Git/evenRealities-webflasher` with the same local changes
-works identically.
-
-1. Build the artifact (`make check`), then `make webflasher-serve`. It installs
-   the committed WebFlasher dependencies with `npm ci` before starting Vite,
-   so a fresh checkout does not fail with `vite: command not found`. When the hashes
-   change, regenerate the pin by updating the copy of
-   `src/lib/localTempleFlashTargets.js` inside the patch
-   (`patches/webflasher_case_usb_thai.patch`) with the new whole-bundle and
-   `ota/s200_firmware_ota.bin` values and re-running `make webflasher`; the
-   Case-USB writer re-hashes the loaded file against that pin before any byte
-   is sent, and a mismatching file is rejected.
-2. Open Advanced Mode → Recovery Console → "Running-temple recovery through
-   the Case". Never use the automatic "Recover with update over USB" panel:
-   it selects the official stock catalog image.
-3. Flash **one lens at a time**. After each flash: confirm the Even app still
-   connects, double-tap the dimple repeatedly to prove the dashboard opens
-   without a reset, then test `น้ำ`, `เก่ง`, `ภาษาไทย`. Only then flash the
-   other lens.
-4. The patched app intentionally reports stock version `2.2.9.22`; the version
-   string cannot distinguish Thai from stock. Physical dashboard/rendering
-   behavior is the only verification.
-5. Rollback uses the same manual panel with the verified stock bundle from
-   `.cache/g2_2.2.9.22.bin`.
-
-Direct Bluetooth flashing of the Thai artifact is rejected by WebFlasher by
-design (`localOnly` pin).
-
-### 4b. Gated BLE route (blocked until the compatibility gate closes)
-
-Start with one lens so the other remains a working reference:
-
-```sh
-python3 tools/gated_g2flash.py --g2flash-root ../g2flash \
-  --operation flash \
-  --selection-record /secure/path/to/device-ota-info.json -- \
-  -c 'g2://local?left=LEFT_UUID&right=RIGHT_UUID&addressType=random' \
-  -f build/g2_2.2.9.22_thai.bin \
-  --lens left
-```
-
-After boot, exercise ordinary stock screens first. Then test Thai strings such
-as `ภาษาไทย`, `กรุงเทพมหานคร`, `น้ำ`, and `เก่ง`. Confirm that the tone and
-nikhahit in `น้ำ` are separated. Then flash the right lens:
-
-```sh
-python3 tools/gated_g2flash.py --g2flash-root ../g2flash \
-  --operation flash \
-  --selection-record /secure/path/to/device-ota-info.json -- \
-  -c 'g2://local?left=LEFT_UUID&right=RIGHT_UUID&addressType=random' \
-  -f build/g2_2.2.9.22_thai.bin \
-  --lens right
-```
-
-Do not close Terminal, suspend the Mac, power off an arm, or restart the Even
-app during a write. G2Flash retries whole components after explicit failures;
-do not manually restart it while a transfer is active.
+Only after these checks pass should the other temple be flashed. The patched
+firmware intentionally reports stock version `2.2.9.22`, so version liveness
+does not distinguish the Thai build; dashboard and rendering checks do.
 
 ## Rollback
 
-Flash the verified stock image with the same connection string, one lens at a
-time:
+Use the same manual Case recovery panel with `.cache/g2_2.2.9.22.bin`, one
+temple at a time. The retained stock bundle is the deterministic rollback
+artifact.
 
-```sh
-python3 tools/gated_g2flash.py --g2flash-root ../g2flash \
-  --operation rollback \
-  --selection-record /secure/path/to/device-ota-info.json -- \
-  -c 'g2://local?left=LEFT_UUID&right=RIGHT_UUID&addressType=random' \
-  -f .cache/g2_2.2.9.22.bin \
-  --lens left
-```
-
-Repeat with `--lens right`. A newer official Even OTA should also replace the
-modified main app, but the locally retained stock image is the deterministic
-rollback artifact.
-
-This project verifies container integrity offline. It cannot prove boot,
-display quality, thermal behavior, or recovery without the physical glasses.
+Offline checks prove container integrity and writer pins only. They cannot
+prove boot, display quality, thermal behavior, or recovery on physical glasses.

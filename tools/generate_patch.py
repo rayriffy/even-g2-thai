@@ -13,8 +13,8 @@ import zlib
 from pathlib import Path
 
 STOCK_SHA256 = "a03fbea9f68a9de6bc271daabb9f3a41c59053d1086622c76a4e990f829cc561"
-FONT_SHA256 = "5a1c559bb539583c8a1fd99d1c5b9491e5e14478c9cd2bd0970d5c3096cc9ef8"
-FONT_SOURCE_COMMIT = "e1118da94a8cb00cf6d06cdac9ef13eb1e5c6ab7"
+FONT_SHA256 = "688f2ef20776a1f0286bd73bef4dd5d5c76640f4a7c4f0ea5f7c1b8d87a969b7"
+FONT_SOURCE_COMMIT = "vendored:third_party/2005_iannnnnAMD.ttf"
 MAINAPP_SUFFIX = "ota/s200_firmware_ota.bin"
 APP_LOAD_ADDR = 0x00438000
 APP_PREAMBLE = 0x20
@@ -211,7 +211,7 @@ def build_spec(stock: bytes, font_blob: bytes, build: dict[str, object]) -> dict
             "offset": payload_end,
             "old": "",
             "new": append.hex(),
-            "desc": "append Thai fallback code and Noto Sans Thai bitmap payload",
+            "desc": "append Thai fallback code and local bitmap payload",
         }
     )
     data.extend(append)

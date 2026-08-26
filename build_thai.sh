@@ -7,15 +7,14 @@ G2FLASH_COMMIT="877c8d9490db0d3717ca012dd0f54556af3701bd"
 CACHE="$ROOT/.cache"
 BUILD="$ROOT/build"
 STOCK="$CACHE/g2_2.2.9.22.bin"
-FONT="$CACHE/NotoSansThai-wdth-wght.ttf"
+FONT="$ROOT/third_party/2005_iannnnnAMD.ttf"
 FONT_BLOB="$BUILD/thai_font.bin"
 PATCH_SPEC="$ROOT/patches/thai_patches.json"
 OUTPUT="$BUILD/g2_2.2.9.22_thai.bin"
 
 FW_URL="https://cdn.evenreal.co/firmware/fc250b05e98a9ff998b4b68f5f99f994.bin"
 FW_SHA256="a03fbea9f68a9de6bc271daabb9f3a41c59053d1086622c76a4e990f829cc561"
-FONT_URL="https://raw.githubusercontent.com/google/fonts/e1118da94a8cb00cf6d06cdac9ef13eb1e5c6ab7/ofl/notosansthai/NotoSansThai%5Bwdth%2Cwght%5D.ttf"
-FONT_SHA256="5a1c559bb539583c8a1fd99d1c5b9491e5e14478c9cd2bd0970d5c3096cc9ef8"
+FONT_SHA256="688f2ef20776a1f0286bd73bef4dd5d5c76640f4a7c4f0ea5f7c1b8d87a969b7"
 
 UPDATE_PATCHES=0
 if [[ "${1:-}" == "--update-patches" ]]; then
@@ -84,7 +83,15 @@ g2flash_dirty="$(git -C "$G2FLASH_ROOT" status --porcelain --untracked-files=all
 fetch_verified "$FW_URL" "$STOCK" "$FW_SHA256" "stock G2 2.2.9.22 firmware"
 
 if [[ "$UPDATE_PATCHES" -eq 1 ]]; then
-  fetch_verified "$FONT_URL" "$FONT" "$FONT_SHA256" "pinned Noto Sans Thai"
+  [[ -f "$FONT" ]] || {
+    echo "missing vendored Thai font at $FONT" >&2
+    exit 1
+  }
+  [[ "$(sha256_file "$FONT")" == "$FONT_SHA256" ]] || {
+    echo "local Thai font SHA-256 mismatch at $FONT" >&2
+    exit 1
+  }
+  echo "verified local 2005_iannnnnAMD Thai font"
   python3 -c 'import PIL' 2>/dev/null || {
     echo "Pillow is required to regenerate patches: python3 -m pip install -r requirements-dev.txt" >&2
     exit 1

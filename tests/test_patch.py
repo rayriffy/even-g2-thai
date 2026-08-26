@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
-import tempfile
 import unittest
 from pathlib import Path
 
@@ -22,13 +21,6 @@ from font_blob import (
     VALID_CODEPOINTS,
 )
 from generate_patch import encode_bl, encode_bw
-from gated_g2flash import (
-    check_ready,
-    firmware_argument,
-    validate_allowed_arguments,
-    validate_operation,
-    validate_selection_record,
-)
 from render_preview import shape_for_preview
 from verify_firmware import verify
 
@@ -122,6 +114,42 @@ class ThaiPatchTests(unittest.TestCase):
         )
         self.assertEqual(record[1], 0)
 
+    def test_combining_marks_overlay_the_preceding_thai_cell(self) -> None:
+        _, _, sizes, glyphs, _, records_offset = HEADER.unpack_from(self.font_blob)
+        combining_marks = [0x0E31, *range(0x0E34, 0x0E3B), 0x0E47, *range(0x0E48, 0x0E4F)]
+        base_index = 0x0E01 - 0x0E00
+        for size_index in range(sizes):
+            row = records_offset + size_index * glyphs * RECORD.size
+            base = RECORD.unpack_from(self.font_blob, row + base_index * RECORD.size)
+            for codepoint in combining_marks:
+                record = RECORD.unpack_from(
+                    self.font_blob,
+                    row + (codepoint - 0x0E00) * RECORD.size,
+                )
+                self.assertEqual(record[1], 0)
+                self.assertLessEqual(record[2], base[1])
+                mark_left = base[1] + record[4]
+                self.assertLess(mark_left, base[1])
+                self.assertGreater(mark_left + record[2], 0)
+
+    def test_all_rasterized_glyphs_fit_their_declared_line_box(self) -> None:
+        _, _, sizes, glyphs, _, records_offset = HEADER.unpack_from(self.font_blob)
+        for size_index in range(sizes):
+            _, line_height, base_line, _ = SIZE_RECORD.unpack_from(
+                self.font_blob, HEADER.size + size_index * SIZE_RECORD.size
+            )
+            row = records_offset + size_index * glyphs * RECORD.size
+            for glyph_index in range(glyphs):
+                record = RECORD.unpack_from(self.font_blob, row + glyph_index * RECORD.size)
+                if not record[-1]:
+                    continue
+                pixels = self._glyph_pixels(record)
+                if not pixels:
+                    continue
+                ys = [y for _, y in pixels]
+                self.assertGreaterEqual(min(ys), -(line_height - base_line))
+                self.assertLess(max(ys), base_line)
+
     def test_patch_has_two_font_chain_hooks(self) -> None:
         hooks = [item for item in self.spec["patches"] if item["desc"].startswith("font chain")]
         self.assertEqual(len(hooks), 2)
@@ -190,114 +218,6 @@ class ThaiPatchTests(unittest.TestCase):
         self.assertNotIn('--output "$path"', source)
         self.assertIn("877c8d9490db0d3717ca012dd0f54556af3701bd", source)
         self.assertIn("sed '/^?? \\.DS_Store$/d'", source)
-
-    def test_unverified_hardware_variant_blocks_g2flash(self) -> None:
-        with self.assertRaisesRegex(ValueError, "compatibility status is unverified"):
-            check_ready(
-                ROOT,
-                ROOT.parent / "g2flash",
-                ["-f", str(ROOT / "build/g2_2.2.9.22_thai.bin"), "--lens", "both"],
-                "transport",
-            )
-
-    def test_gated_g2flash_rejects_duplicate_firmware_options(self) -> None:
-        with self.assertRaisesRegex(ValueError, "exactly one firmware image"):
-            firmware_argument(["-f", "approved.bin", "--firmware", "other.bin"])
-        with self.assertRaisesRegex(ValueError, "abbreviated"):
-            validate_allowed_arguments(["--firm", "other.bin"])
-
-    def test_gated_g2flash_pins_operation_shape(self) -> None:
-        connection = "g2://local?left=L&right=R&addressType=random"
-        validate_operation([], "discover")
-        validate_operation(
-            ["-c", connection, "--lens", "both", "--stop-before", "file_check"],
-            "transport",
-        )
-        with self.assertRaisesRegex(ValueError, "requires one lens"):
-            validate_operation(["-c", connection, "--lens", "both"], "flash")
-        with self.assertRaisesRegex(ValueError, "requires --lens both"):
-            validate_operation(
-                ["-c", connection, "--lens", "left", "--stop-before", "file_check"],
-                "transport",
-            )
-        with self.assertRaisesRegex(ValueError, "g2://local"):
-            validate_operation(
-                [
-                    "-c",
-                    "g2://droidbridge?phone=host&port=1&token=secret&left=L&right=R",
-                    "--lens",
-                    "both",
-                    "--stop-before",
-                    "file_check",
-                ],
-                "transport",
-            )
-        with self.assertRaisesRegex(ValueError, "unreviewed"):
-            validate_allowed_arguments(["--my-warranty-is-void"])
-
-    def test_protected_selection_record_matches_redacted_evidence(self) -> None:
-        compatibility = {
-            "hardware_revision": "5",
-            "mode": "<empty>",
-            "region": "TH",
-            "type": "glasses",
-            "source": "owned Even app authenticated response",
-            "left_endpoint_name_sha256": hashlib.sha256(b"Even G2_test_L_ABC").hexdigest(),
-            "right_endpoint_name_sha256": hashlib.sha256(b"Even G2_test_R_DEF").hexdigest(),
-        }
-        artifact = {
-            "source_url": "https://cdn.evenreal.co/firmware/example.bin",
-            "sub_path": "firmware/example.bin",
-            "file_size": 123,
-            "file_sign": "vendor-signature",
-        }
-        protected = {
-            "schema_version": 1,
-            "target_version": "2.2.8.4",
-            "hardware_revision": "5",
-            "source": "owned Even app authenticated response",
-            "captured_at": "2026-08-20T00:00:00Z",
-            "cdn_base": "https://cdn.evenreal.co/",
-            "endpoints": {
-                "left_name": "Even G2_test_L_ABC",
-                "right_name": "Even G2_test_R_DEF",
-                "left_version": "2.2.8.4",
-                "right_version": "2.2.8.4",
-            },
-            "device_ota_info": {
-                "version": "2.2.8.4",
-                "sn": "test-owned-device",
-                "mode": "",
-                "region": "TH",
-                "type": "glasses",
-                "subPath": "firmware/example.bin",
-                "fileSize": 123,
-                "fileSign": "vendor-signature",
-            },
-        }
-        with tempfile.TemporaryDirectory() as directory:
-            record = Path(directory) / "selection.json"
-            record.write_text(json.dumps(protected))
-            validate_selection_record(record, "2.2.8.4", compatibility, artifact)
-            protected["device_ota_info"]["version"] = "2.2.6.10"
-            record.write_text(json.dumps(protected))
-            with self.assertRaisesRegex(ValueError, "version does not match"):
-                validate_selection_record(record, "2.2.8.4", compatibility, artifact)
-            protected["device_ota_info"]["version"] = "2.2.8.4"
-            protected["hardware_revision"] = ""
-            record.write_text(json.dumps(protected))
-            with self.assertRaisesRegex(ValueError, "must not be empty"):
-                validate_selection_record(record, "2.2.8.4", compatibility, artifact)
-            protected["hardware_revision"] = "5"
-            protected["device_ota_info"]["fileSize"] = 999
-            record.write_text(json.dumps(protected))
-            with self.assertRaisesRegex(ValueError, "fileSize does not match"):
-                validate_selection_record(record, "2.2.8.4", compatibility, artifact)
-            protected["device_ota_info"]["fileSize"] = 123
-            protected["device_ota_info"].pop("region")
-            record.write_text(json.dumps(protected))
-            with self.assertRaisesRegex(ValueError, "missing region"):
-                validate_selection_record(record, "2.2.8.4", compatibility, artifact)
 
     def test_apply_and_verify_when_stock_is_cached(self) -> None:
         self.assertEqual(self.spec["base"], "g2_2.2.9.22.bin")

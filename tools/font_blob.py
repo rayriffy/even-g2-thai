@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 import PIL
-from PIL import ImageFont
+from PIL import ImageFont, features
 
 MAGIC = 0x49414854  # "THAI" in little endian
 VERSION = 2
@@ -20,6 +20,9 @@ THAI_START = 0x0E00
 THAI_COUNT = 0x80
 ALT_START = 0xF700
 TONE_MARKS = (0x0E48, 0x0E49, 0x0E4A, 0x0E4B)
+COMBINING_MARKS = frozenset(
+    [0x0E31, *range(0x0E34, 0x0E3B), 0x0E47, *range(0x0E48, 0x0E4F)]
+)
 GLYPH_COUNT = THAI_COUNT + len(TONE_MARKS)
 RECORD = struct.Struct("<IHBBbbBB")
 HEADER = struct.Struct("<IHHHHI")
@@ -30,12 +33,66 @@ VALID_CODEPOINTS = frozenset(
 
 
 def _font(path: Path, size: int) -> ImageFont.FreeTypeFont:
-    font = ImageFont.truetype(str(path), size)
+    if not features.check_feature("raqm"):
+        raise RuntimeError("Pillow with Raqm is required to shape Thai combining marks")
+    font = ImageFont.truetype(str(path), size, layout_engine=ImageFont.Layout.RAQM)
     try:
         font.set_variation_by_name("Regular")
     except (AttributeError, OSError, ValueError):
         pass
     return font
+
+
+def _shaped_combining_mark(
+    font: ImageFont.FreeTypeFont, codepoint: int, base_cell: int
+) -> tuple[bytes, int, int, int, int]:
+    base_mask, (base_left, base_top) = font.getmask2("ก", mode="L", anchor="ls")
+    pair_mask, (pair_left, pair_top) = font.getmask2(
+        f"ก{chr(codepoint)}", mode="L", anchor="ls"
+    )
+    base_width, base_height = base_mask.size
+    pair_width, pair_height = pair_mask.size
+    left = min(base_left, pair_left)
+    top = min(base_top, pair_top)
+    right = max(base_left + base_width, pair_left + pair_width)
+    bottom = max(base_top + base_height, pair_top + pair_height)
+    width, height = right - left, bottom - top
+    base_pixels = bytearray(width * height)
+    pair_pixels = bytearray(width * height)
+
+    for source, source_width, source_height, source_left, source_top, target in (
+        (bytes(base_mask), base_width, base_height, base_left, base_top, base_pixels),
+        (bytes(pair_mask), pair_width, pair_height, pair_left, pair_top, pair_pixels),
+    ):
+        for y in range(source_height):
+            target_offset = (source_top - top + y) * width + source_left - left
+            source_offset = y * source_width
+            for x in range(source_width):
+                target[target_offset + x] = max(target[target_offset + x], source[source_offset + x])
+
+    mark_pixels = bytearray(
+        max(0, pair_pixel - base_pixel)
+        for base_pixel, pair_pixel in zip(base_pixels, pair_pixels)
+    )
+    visible = [index for index, value in enumerate(mark_pixels) if value]
+    if not visible:
+        raise ValueError(f"U+{codepoint:04X} has no shaped combining-mark pixels")
+    min_x = min(index % width for index in visible)
+    max_x = max(index % width for index in visible)
+    min_y = min(index // width for index in visible)
+    max_y = max(index // width for index in visible)
+    mark_width, mark_height = max_x - min_x + 1, max_y - min_y + 1
+    cropped = b"".join(
+        mark_pixels[(min_y + y) * width + min_x : (min_y + y) * width + max_x + 1]
+        for y in range(mark_height)
+    )
+    return (
+        cropped,
+        mark_width,
+        mark_height,
+        left + min_x - base_cell,
+        top + min_y,
+    )
 
 
 def _pack_a4(mask: object, width: int, height: int) -> tuple[bytes, int]:
@@ -70,21 +127,27 @@ def build_blob(font_path: Path) -> tuple[bytes, dict[str, object]]:
     for size in SIZES:
         font = _font(font_path, size)
         ascent, descent = font.getmetrics()
-        size_rows.append((size, ascent + descent, descent, 0))
+        base_cell = round(font.getlength("ก"))
         records: list[tuple[int, int, int, int, int, int, int, int]] = []
         rendered: dict[
             int, tuple[tuple[int, int, int, int, int, int, int, int], set[tuple[int, int]]]
         ] = {}
+        line_pixels: set[tuple[int, int]] = set()
 
         for codepoint in range(THAI_START, THAI_START + THAI_COUNT):
             if codepoint not in VALID_CODEPOINTS:
                 records.append((0, 0, 0, 0, 0, 0, 0, 0))
                 continue
 
-            char = chr(codepoint)
-            mask, (left, top) = font.getmask2(char, mode="L", anchor="ls")
-            width, height = mask.size
-            advance = round(font.getlength(char))
+            if codepoint in COMBINING_MARKS:
+                mask, width, height, left, top = _shaped_combining_mark(
+                    font, codepoint, base_cell
+                )
+                advance = 0
+            else:
+                mask, (left, top) = font.getmask2(chr(codepoint), mode="L", anchor="ls")
+                width, height = mask.size
+                advance = round(font.getlength(chr(codepoint)))
             bottom = top + height
             packed, row_bytes = _pack_a4(mask, width, height)
             pixels = bytes(mask)
@@ -110,6 +173,7 @@ def build_blob(font_path: Path) -> tuple[bytes, dict[str, object]]:
             record = (bitmap_offset, advance, width, height, left, -bottom, row_bytes, 1)
             records.append(record)
             rendered[codepoint] = (record, collision_pixels)
+            line_pixels.update(collision_pixels)
             bitmaps.append(packed)
             bitmap_offset += len(packed)
 
@@ -117,7 +181,7 @@ def build_blob(font_path: Path) -> tuple[bytes, dict[str, object]]:
         size_shifts: dict[str, int] = {}
         for tone_mark in TONE_MARKS:
             base_record, tone_pixels = rendered[tone_mark]
-            raise_by = 0
+            raise_by = 1
             while any((x, y - raise_by) in sara_am_pixels for x, y in tone_pixels):
                 raise_by += 1
             alternate = list(base_record)
@@ -125,8 +189,14 @@ def build_blob(font_path: Path) -> tuple[bytes, dict[str, object]]:
             if alternate[5] > 127:
                 raise ValueError(f"U+{tone_mark:04X} {size}px raised ofs_y out of range")
             records.append(tuple(alternate))
+            line_pixels.update((x, y - raise_by) for x, y in tone_pixels)
             size_shifts[f"U+{tone_mark:04X}"] = raise_by
 
+        min_y = min(y for _, y in line_pixels)
+        max_y = max(y for _, y in line_pixels)
+        ascent = max(ascent, -min_y)
+        descent = max(descent, max_y + 1)
+        size_rows.append((size, ascent + descent, descent, 0))
         raised_tone_shifts[size] = size_shifts
         all_records.append(records)
 
