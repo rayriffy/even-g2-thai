@@ -56,6 +56,15 @@ and expand packed A4 pixels into LVGL's A8 draw buffer. The callback invokes
 the active draw-buffer handler's cache flush, matching LVGL's built-in
 bitmap-font path.
 
+## Rendering cost
+
+The firmware converts each embedded glyph from packed A4 to LVGL A8 in the
+draw buffer. The hot loop expands two output pixels per packed byte through a
+16-entry lookup table, preserving the exact A8 values and cache-flush call
+while avoiding per-pixel branches and multiplication. UTF-8 backtracking for a
+preceding mark runs only after the current codepoint is known to be a tone
+mark, rather than on every decoded character.
+
 ## Thai shaping boundary
 
 LVGL decodes UTF-8 and supports font fallback, but it does not provide general

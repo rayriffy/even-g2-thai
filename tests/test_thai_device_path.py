@@ -53,8 +53,16 @@ class ThaiDevicePathTests(unittest.TestCase):
         if not ARTIFACT.exists():
             raise unittest.SkipTest("built Thai artifact absent")
         cls.payload = _main_payload(ARTIFACT.read_bytes())
-        metadata = json.loads(SPEC.read_text())["metadata"]
+        spec = json.loads(SPEC.read_text())
+        metadata = spec["metadata"]
         cls.font_blob_bytes = int(metadata["font_blob_bytes"])
+        append = next(
+            bytes.fromhex(patch["new"])
+            for patch in spec["patches"]
+            if patch["desc"].startswith("append Thai")
+        )
+        start = int(metadata["font_blob_offset_in_append"])
+        cls.font_blob = append[start : start + cls.font_blob_bytes]
 
     def setUp(self) -> None:
         import unicorn.arm_const as arm_const
@@ -214,6 +222,29 @@ class ThaiDevicePathTests(unittest.TestCase):
                     self.uc.mem_write(draw_desc + 16, struct.pack("<I", pixels))
                     self.uc.mem_write(draw_desc + 24, struct.pack("<I", handler_table))
                     self.call(layout["bitmap"], [dsc_buffer, draw_desc])
+                    _, _, size_count, glyph_count, _, records_offset = struct.unpack_from(
+                        "<IHHHHI", self.font_blob
+                    )
+                    self.assertEqual(size_count, 8)
+                    font_index = sorted(fonts).index(size)
+                    record_offset = records_offset + (
+                        font_index * glyph_count + codepoint - THAI_START
+                    ) * 12
+                    bitmap_offset, _, _, _, _, _, row_bytes, _ = struct.unpack_from(
+                        "<IHBBbbBB", self.font_blob, record_offset
+                    )
+                    for y in range(box_h):
+                        expected = bytearray()
+                        row = self.font_blob[
+                            bitmap_offset + y * row_bytes : bitmap_offset + (y + 1) * row_bytes
+                        ]
+                        for packed in row:
+                            expected.extend(((packed >> 4) * 17, (packed & 0x0F) * 17))
+                        self.assertEqual(
+                            self.uc.mem_read(pixels + y * stride, box_w),
+                            bytes(expected[:box_w]),
+                            f"size {size} codepoint {codepoint:#06x} A4 expansion drifted",
+                        )
                     self.assertEqual(
                         self.read_word(guard_after),
                         sentinel,

@@ -146,9 +146,9 @@ index 0000000..3e96428
 +
 +export const LOCAL_G2_TEMPLE_FLASH_TARGETS = Object.freeze([
 +  Object.freeze({
-+    imageSha256: "61720010a61513f6a144e8153258c61ddcbc821d57d9e123456fe282c2265f98",
-+    mainSha256: "e6a934bddf106392f381f6cbac7ed105127923581e0889aa743c2b93f4299654",
-+    mainBytes: 3826982,
++    imageSha256: "1131f07fd879a63f8678461b3122140dc158b5e0cff11a86ca472efc83afe398",
++    mainSha256: "400d3feddecc5a6d9b133b16bb6d25a6f25a4063a6ad042676db47fa18d88124",
++    mainBytes: 3827198,
 +    version: "2.2.9.22",
 +    reportedVersion: "2.2.9.22",
 +    label: "Thai G2 2.2.9.22 · 2005_iannnnnAMD · local Case USB only",

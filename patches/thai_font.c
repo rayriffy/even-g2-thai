@@ -43,6 +43,11 @@ typedef void *(*stock_chain_build_fn)(void *configs, uint32_t count);
 typedef uint32_t (*stock_decode_fn)(const char *text, uint32_t *offset);
 typedef void (*flush_cache_fn)(const void *draw_buf, const void *area);
 
+static const uint8_t a4_to_a8[16] = {
+    0u, 17u, 34u, 51u, 68u, 85u, 102u, 119u,
+    136u, 153u, 170u, 187u, 204u, 221u, 238u, 255u,
+};
+
 /* Exact 32-bit lv_font_t word layout for the authenticated LVGL 9.3 build. */
 #define FONT_WORDS(line_height, base_line, index) \
     {FONT_DSC_MAGIC, FONT_BITMAP_MAGIC, 0u, line_height, base_line, 0u, 0u, 0u, index}
@@ -148,10 +153,14 @@ const void *thai_get_glyph_bitmap(void *glyph_dsc, void *draw_buf) {
     for(uint32_t y = 0; y < glyph->box_h; y++) {
         const uint8_t *row = source + y * glyph->row_bytes;
         uint8_t *out = target + y * stride;
-        for(uint32_t x = 0; x < glyph->box_w; x++) {
-            uint8_t packed = row[x >> 1];
-            uint8_t alpha = (x & 1u) ? (packed & 0x0Fu) : (packed >> 4);
-            out[x] = (uint8_t)(alpha * 17u);
+        uint32_t pairs = glyph->box_w >> 1;
+        while(pairs--) {
+            uint8_t packed = *row++;
+            *out++ = a4_to_a8[packed >> 4];
+            *out++ = a4_to_a8[packed & 0x0Fu];
+        }
+        if(glyph->box_w & 1u) {
+            *out = a4_to_a8[*row >> 4];
         }
     }
 
@@ -196,13 +205,14 @@ void thai_text_encoded_letter_next_2(const char *text, uint32_t *letter,
     uint32_t current_offset = *active_offset;
     uint32_t current = 0;
     uint32_t next = 0;
-    uint32_t previous = 0;
     if(decode) current = decode(text, active_offset);
     if(decode && current) next = decode(text + *active_offset, 0);
-    if(decode && current_offset) previous = previous_codepoint(decode, text, current_offset);
-    if(current >= TONE_MARK_START && current < TONE_MARK_START + ALT_COUNT &&
-       (next == SARA_AM || is_upper_mark(previous))) {
-        current = ALT_START + current - TONE_MARK_START;
+    if(current >= TONE_MARK_START && current < TONE_MARK_START + ALT_COUNT) {
+        int raise_tone = next == SARA_AM;
+        if(!raise_tone && decode && current_offset) {
+            raise_tone = is_upper_mark(previous_codepoint(decode, text, current_offset));
+        }
+        if(raise_tone) current = ALT_START + current - TONE_MARK_START;
     }
     *letter = current;
     *letter_next = next;

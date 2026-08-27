@@ -215,6 +215,8 @@ class ThaiPatchTests(unittest.TestCase):
         self.assertNotIn("STOCK_UTF8_NEXT_THUMB", source)
         self.assertIn("uint32_t *active_offset = offset ? offset : &local_offset;", source)
         self.assertIn("next = decode(text + *active_offset, 0);", source)
+        self.assertIn("if(!raise_tone && decode && current_offset)", source)
+        self.assertIn("a4_to_a8[16]", source)
 
     def test_chain_append_only_writes_writable_ram(self) -> None:
         source = (ROOT / "patches/thai_font.c").read_text()
