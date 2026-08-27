@@ -8,6 +8,7 @@ CACHE="$ROOT/.cache"
 BUILD="$ROOT/build"
 STOCK="$CACHE/g2_2.2.9.22.bin"
 FONT="$ROOT/third_party/2005_iannnnnAMD.ttf"
+FONT_THIN_EDGES=1
 FONT_BLOB="$BUILD/thai_font.bin"
 PATCH_SPEC="$ROOT/patches/thai_patches.json"
 OUTPUT="$BUILD/g2_2.2.9.22_thai.bin"
@@ -96,7 +97,7 @@ if [[ "$UPDATE_PATCHES" -eq 1 ]]; then
     echo "Pillow is required to regenerate patches: python3 -m pip install -r requirements-dev.txt" >&2
     exit 1
   }
-  python3 "$ROOT/tools/font_blob.py" "$FONT" "$FONT_BLOB"
+  python3 "$ROOT/tools/font_blob.py" "$FONT" "$FONT_BLOB" --thin "$FONT_THIN_EDGES"
   python3 "$ROOT/tools/render_preview.py" "$FONT_BLOB" "$BUILD/thai-preview.png"
   python3 "$ROOT/tools/generate_patch.py" \
     --stock "$STOCK" \

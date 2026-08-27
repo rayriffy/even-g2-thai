@@ -49,10 +49,12 @@ The fallback stores `2005_iannnnnAMD` alpha masks at eight stock target sizes,
 rasterized at 2× source resolution because this font's Thai glyph design is
 visually about half the requested pixel size. Host-side Raqm shaping extracts
 combining marks without the font's dotted-circle scaffolds and synthesizes
-U+0E33 SARA AM from shaped U+0E4D nikhahit plus U+0E32 sara aa. Its callbacks
-return LVGL 9.3 glyph descriptors and expand packed A4 pixels into LVGL's A8
-draw buffer. The callback invokes the active draw-buffer handler's cache flush,
-matching LVGL's built-in bitmap-font path.
+U+0E33 SARA AM from shaped U+0E4D nikhahit plus U+0E32 sara aa. One source
+pixel of outer-edge alpha is softened to reduce the font's visual weight while
+keeping strokes continuous. Its callbacks return LVGL 9.3 glyph descriptors
+and expand packed A4 pixels into LVGL's A8 draw buffer. The callback invokes
+the active draw-buffer handler's cache flush, matching LVGL's built-in
+bitmap-font path.
 
 ## Thai shaping boundary
 

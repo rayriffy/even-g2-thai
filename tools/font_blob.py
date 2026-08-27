@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import argparse
 import struct
 import sys
 from pathlib import Path
@@ -152,7 +153,29 @@ def _pack_a4(mask: object, width: int, height: int) -> tuple[bytes, int]:
     return bytes(packed), row_bytes
 
 
-def build_blob(font_path: Path) -> tuple[bytes, dict[str, object]]:
+def _thin_mask(mask: object, width: int, height: int, edges: int) -> bytes:
+    pixels = bytearray(bytes(mask))
+    for _ in range(edges):
+        source = pixels[:]
+        for y in range(height):
+            for x in range(width):
+                index = y * width + x
+                if (
+                    source[index] < 128
+                    or x == 0
+                    or y == 0
+                    or x + 1 == width
+                    or y + 1 == height
+                    or source[index - 1] < 128
+                    or source[index + 1] < 128
+                    or source[index - width] < 128
+                    or source[index + width] < 128
+                ):
+                    pixels[index] = min(source[index], 96)
+    return bytes(pixels)
+
+
+def build_blob(font_path: Path, thin_edges: int = 0) -> tuple[bytes, dict[str, object]]:
     if PIL.__version__ != PILLOW_VERSION:
         raise RuntimeError(
             f"Pillow {PILLOW_VERSION} is required for reproducible rasters; "
@@ -195,6 +218,8 @@ def build_blob(font_path: Path) -> tuple[bytes, dict[str, object]]:
                 mask, (left, top) = font.getmask2(chr(codepoint), mode="L", anchor="ls")
                 width, height = mask.size
                 advance = round(font.getlength(chr(codepoint)))
+            if thin_edges:
+                mask = _thin_mask(mask, width, height, thin_edges)
             bottom = top + height
             packed, row_bytes = _pack_a4(mask, width, height)
             pixels = bytes(mask)
@@ -263,6 +288,7 @@ def build_blob(font_path: Path) -> tuple[bytes, dict[str, object]]:
         "font_sha256": hashlib.sha256(font_path.read_bytes()).hexdigest(),
         "blob_sha256": hashlib.sha256(output).hexdigest(),
         "blob_bytes": len(output),
+        "thin_edges": thin_edges,
             "sizes": [
             {
                 "target_pixel_size": row[0],
@@ -283,13 +309,14 @@ def build_blob(font_path: Path) -> tuple[bytes, dict[str, object]]:
 
 
 def main() -> int:
-    if len(sys.argv) != 3:
-        print(f"usage: {sys.argv[0]} FONT OUTPUT", file=sys.stderr)
-        return 2
-    font_path, output_path = map(Path, sys.argv[1:])
-    blob, report = build_blob(font_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_bytes(blob)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("font", type=Path)
+    parser.add_argument("output", type=Path)
+    parser.add_argument("--thin", type=int, default=0, choices=(0, 1))
+    args = parser.parse_args()
+    blob, report = build_blob(args.font, thin_edges=args.thin)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_bytes(blob)
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0
 

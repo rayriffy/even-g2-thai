@@ -146,8 +146,8 @@ index 0000000..3e96428
 +
 +export const LOCAL_G2_TEMPLE_FLASH_TARGETS = Object.freeze([
 +  Object.freeze({
-+    imageSha256: "452e490dc19e65ab6a1da799ae882a09ebe1829f5ff7afc3784af97f53729212",
-+    mainSha256: "17bae4f5fc86b9211d9eeeea313f6e21f1313e3e9495493fdc1eb37c3d04cc51",
++    imageSha256: "61720010a61513f6a144e8153258c61ddcbc821d57d9e123456fe282c2265f98",
++    mainSha256: "e6a934bddf106392f381f6cbac7ed105127923581e0889aa743c2b93f4299654",
 +    mainBytes: 3826982,
 +    version: "2.2.9.22",
 +    reportedVersion: "2.2.9.22",

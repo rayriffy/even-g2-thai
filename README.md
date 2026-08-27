@@ -86,12 +86,14 @@ production build inside the submodule before touching hardware.
 
 - Thai code points `U+0E01..U+0E3A`, `U+0E3F`, and `U+0E40..U+0E5B`.
 - Eight raster sizes selected at runtime from the active stock font's line
-  height.
-- Contextual raised tone-mark alternates for `U+0E48..U+0E4B` immediately
-  before `U+0E33` SARA AM, preventing the `น้ำ` nikhahit/tone collision.
-- Zero-advance combining marks and Noto's unshaped glyph bearings are retained.
+  height, rendered from this font at 2× source resolution with softened outer
+  edge pixels.
+- Contextual raised tone-mark alternates for `U+0E48..U+0E4B` before
+  `U+0E33` SARA AM or after an upper Thai mark, preventing collisions in
+  `น้ำ`, `นี้`, and future valid clusters.
+- Zero-advance, anchored combining marks and synthetic U+0E33 SARA AM.
 - No HarfBuzz/GPOS engine is added. Thai glyphs render, but complex mark
-  positioning outside the implemented SARA AM rule can differ from phone
+  positioning outside the implemented Unicode mark-class rules can differ from phone
   typography.
 - Offline firmware construction and checksum verification are automated.
   Real-glass rendering and recovery remain hardware validation gates.
