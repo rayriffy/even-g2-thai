@@ -163,6 +163,12 @@ class ThaiDevicePathTests(unittest.TestCase):
         # End of string: the decoder reports no letter and leaves the offset.
         self.assertEqual(self.decode_step(text, 9), [0, 0, 9])
 
+    def test_tone_after_upper_vowel_maps_to_alternate(self) -> None:
+        text = self.utf8("นี้")
+        self.assertEqual(self.decode_step(text, 0), [0x0E19, 0x0E35, 3])
+        self.assertEqual(self.decode_step(text, 3), [0x0E35, 0x0E49, 6])
+        self.assertEqual(self.decode_step(text, 6), [ALT_START + 1, 0, 9])
+
     def test_plain_tone_mark_without_sara_am_is_untouched(self) -> None:
         text = self.utf8("เก่ง")
         self.assertEqual(self.decode_step(text, 0), [0x0E40, 0x0E01, 3])

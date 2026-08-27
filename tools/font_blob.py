@@ -27,6 +27,7 @@ TONE_MARKS = (0x0E48, 0x0E49, 0x0E4A, 0x0E4B)
 COMBINING_MARKS = frozenset(
     [0x0E31, *range(0x0E34, 0x0E3B), 0x0E47, *range(0x0E48, 0x0E4F)]
 )
+UPPER_MARKS = frozenset([0x0E31, *range(0x0E34, 0x0E38), 0x0E47, 0x0E4C, 0x0E4D, 0x0E4E])
 GLYPH_COUNT = THAI_COUNT + len(TONE_MARKS)
 RECORD = struct.Struct("<IHBBbbBB")
 HEADER = struct.Struct("<IHHHHI")
@@ -223,12 +224,14 @@ def build_blob(font_path: Path) -> tuple[bytes, dict[str, object]]:
             bitmaps.append(packed)
             bitmap_offset += len(packed)
 
-        sara_am_pixels = rendered[0x0E33][1]
+        upper_mark_pixels = set(rendered[SARA_AM][1])
+        for codepoint in UPPER_MARKS:
+            upper_mark_pixels.update(rendered[codepoint][1])
         size_shifts: dict[str, int] = {}
         for tone_mark in TONE_MARKS:
             base_record, tone_pixels = rendered[tone_mark]
             raise_by = 1
-            while any((x, y - raise_by) in sara_am_pixels for x, y in tone_pixels):
+            while any((x, y - raise_by) in upper_mark_pixels for x, y in tone_pixels):
                 raise_by += 1
             alternate = list(base_record)
             alternate[5] += raise_by

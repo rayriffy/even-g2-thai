@@ -11,7 +11,7 @@ test:
 
 check: build test
 
-webflasher:
+webflasher: build
 	@test -e third_party/evenRealities-webflasher/.git || \
 	  git submodule update --init third_party/evenRealities-webflasher
 	@if [ -f third_party/evenRealities-webflasher/src/lib/localTempleFlashTargets.js ]; then \

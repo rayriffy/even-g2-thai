@@ -11,7 +11,8 @@ from PIL import Image
 
 from font_blob import ALT_START, HEADER, RECORD, SIZE_RECORD, THAI_COUNT, THAI_START
 
-SAMPLES = ("ภาษาไทย", "กรุงเทพมหานคร", "น้ำ", "เก่ง")
+SAMPLES = ("ภาษาไทย", "กรุงเทพมหานคร", "น้ำ", "นี้", "เก่ง")
+UPPER_MARKS = frozenset([0x0E31, *range(0x0E34, 0x0E38), 0x0E47, 0x0E4C, 0x0E4D, 0x0E4E])
 
 
 def glyph_index(codepoint: int) -> int | None:
@@ -24,9 +25,14 @@ def glyph_index(codepoint: int) -> int | None:
 
 def shape_for_preview(text: str) -> list[int]:
     codepoints = [ord(char) for char in text]
-    for index in range(len(codepoints) - 1):
-        current, following = codepoints[index : index + 2]
-        if 0x0E48 <= current <= 0x0E4B and following == 0x0E33:
+    for index in range(len(codepoints)):
+        current = codepoints[index]
+        following = codepoints[index + 1] if index + 1 < len(codepoints) else 0
+        previous = codepoints[index - 1] if index else 0
+        if (
+            0x0E48 <= current <= 0x0E4B
+            and (following == 0x0E33 or previous in UPPER_MARKS)
+        ):
             codepoints[index] = ALT_START + current - 0x0E48
     return codepoints
 

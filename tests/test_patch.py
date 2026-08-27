@@ -105,6 +105,7 @@ class ThaiPatchTests(unittest.TestCase):
         shaped = shape_for_preview("น้ำ")
         self.assertEqual(shaped, [0x0E19, ALT_START + 1, 0x0E33])
         self.assertEqual(shape_for_preview("น้า"), [0x0E19, 0x0E49, 0x0E32])
+        self.assertEqual(shape_for_preview("นี้"), [0x0E19, 0x0E35, ALT_START + 1])
 
     def test_sara_am_includes_nikhahit_above_sara_aa(self) -> None:
         _, _, sizes, glyphs, _, records_offset = HEADER.unpack_from(self.font_blob)

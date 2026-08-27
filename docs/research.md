@@ -59,7 +59,9 @@ matching LVGL's built-in bitmap-font path.
 LVGL decodes UTF-8 and supports font fallback, but it does not provide general
 Thai OpenType shaping. The build pre-bakes the required mark anchors, SARA AM,
 and raised tone variants into bitmap records; firmware does not execute GPOS
-mark-to-base/mark-to-mark tables. Device testing must include stacked vowel and
+mark-to-base/mark-to-mark tables. The decoder classifies preceding upper Thai
+marks, so a following tone selects the raised variant for any valid future
+cluster such as `นี้`, rather than matching a word list. Device testing must include stacked vowel and
 tone-mark sequences, not only consonants.
 
 ### SARA AM and tone marks

@@ -168,17 +168,40 @@ static stock_decode_fn stock_decoder(void) {
     return (stock_decode_fn)(uintptr_t)read_u32((const uint8_t *)(uintptr_t)storage);
 }
 
+static int is_upper_mark(uint32_t codepoint) {
+    return codepoint == 0x0E31u ||
+           (codepoint >= 0x0E34u && codepoint <= 0x0E37u) ||
+           codepoint == 0x0E47u || codepoint == 0x0E4Cu ||
+           codepoint == 0x0E4Du || codepoint == 0x0E4Eu;
+}
+
+static uint32_t previous_codepoint(stock_decode_fn decode, const char *text,
+                                   uint32_t current_offset) {
+    uint32_t cursor = 0;
+    uint32_t previous = 0;
+    while(cursor < current_offset) {
+        uint32_t before = cursor;
+        previous = decode(text, &cursor);
+        if(!previous || cursor <= before || cursor > current_offset) return 0;
+    }
+    return cursor == current_offset ? previous : 0;
+}
+
 __attribute__((used, noinline))
 void thai_text_encoded_letter_next_2(const char *text, uint32_t *letter,
                                      uint32_t *letter_next, uint32_t *offset) {
     stock_decode_fn decode = stock_decoder();
     uint32_t local_offset = 0;
     uint32_t *active_offset = offset ? offset : &local_offset;
+    uint32_t current_offset = *active_offset;
     uint32_t current = 0;
     uint32_t next = 0;
+    uint32_t previous = 0;
     if(decode) current = decode(text, active_offset);
     if(decode && current) next = decode(text + *active_offset, 0);
-    if(current >= TONE_MARK_START && current < TONE_MARK_START + ALT_COUNT && next == SARA_AM) {
+    if(decode && current_offset) previous = previous_codepoint(decode, text, current_offset);
+    if(current >= TONE_MARK_START && current < TONE_MARK_START + ALT_COUNT &&
+       (next == SARA_AM || is_upper_mark(previous))) {
         current = ALT_START + current - TONE_MARK_START;
     }
     *letter = current;
