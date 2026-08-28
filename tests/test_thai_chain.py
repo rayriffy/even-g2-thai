@@ -9,6 +9,7 @@ HardFault, and assert the append is idempotent and cycle-safe."""
 from __future__ import annotations
 
 import importlib.util
+import json
 import shutil
 import struct
 import sys
@@ -18,7 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 G2FLASH = ROOT.parent / "g2flash"
 SOURCE = ROOT / "patches" / "thai_font.c"
-FONT_BLOB = ROOT / "build" / "thai_font.bin"
+PATCH_SPEC = ROOT / "patches" / "thai_patches.json"
 
 CODE_BASE = 0x007D0000
 FLASH_BASE = 0x00400000
@@ -58,7 +59,15 @@ class ThaiChainEmulationTests(unittest.TestCase):
 
         cls.g2build = g2build
         blob, funcs, _rodata_len = g2build.compile_text(str(SOURCE))
-        cls.font_blob = FONT_BLOB.read_bytes()
+        spec = json.loads(PATCH_SPEC.read_text())
+        metadata = spec["metadata"]
+        append = next(
+            bytes.fromhex(patch["new"])
+            for patch in spec["patches"]
+            if patch["desc"].startswith("append Thai")
+        )
+        start = int(metadata["font_blob_offset_in_append"])
+        cls.font_blob = append[start : start + int(metadata["font_blob_bytes"])]
         patched_blob = bytes(blob)
         magic = struct.pack("<I", FONT_DATA_MAGIC)
         if patched_blob.count(magic) != 1:
