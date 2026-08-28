@@ -21,7 +21,7 @@ from font_blob import (
     VALID_CODEPOINTS,
     _thin_mask,
 )
-from generate_patch import encode_bl, encode_bw
+from generate_patch import LV_MALLOC_SITE, encode_bl, encode_bw
 from render_preview import shape_for_preview
 from verify_firmware import verify
 
@@ -228,6 +228,7 @@ class ThaiPatchTests(unittest.TestCase):
         self.assertIn("#define GLYPH_DSC_GID_OFFSET 24u", source)
         self.assertIn("#define STOCK_CHAIN_BUILD_THUMB 0x00470989u", source)
         self.assertIn("#define STOCK_DECODE_SLOT_INDIRECT 0x00491F14u", source)
+        self.assertIn("#define LV_MALLOC_THUMB 0x00458383u", source)
         self.assertNotIn("STOCK_UTF8_NEXT_THUMB", source)
         self.assertIn("uint32_t *active_offset = offset ? offset : &local_offset;", source)
         self.assertIn("next = decode(text + *active_offset, 0);", source)
@@ -235,6 +236,11 @@ class ThaiPatchTests(unittest.TestCase):
         self.assertNotIn("previous_codepoint(", source)
         self.assertIn("a4_to_a8[16]", source)
         self.assertIn("a4_to_a8_pair[256]", source)
+        self.assertIn("static int cache_restore(", source)
+        self.assertIn("static void cache_store(", source)
+        self.assertIn("return runtime->font;", source)
+        self.assertEqual(self.spec["metadata"]["lv_malloc_address"], "0x00458382")
+        self.assertEqual(LV_MALLOC_SITE[0], 0x00458382)
 
     def test_chain_append_only_writes_writable_ram(self) -> None:
         source = (ROOT / "patches/thai_font.c").read_text()

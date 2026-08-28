@@ -70,6 +70,17 @@ cache flush. The only context-sensitive decoder case—tone marks after upper
 Thai marks—now identifies the immediately preceding fixed-width Thai UTF-8
 sequence directly instead of re-decoding the text prefix.
 
+The fallback also keeps four bounded A8 glyph slots in a writable runtime font
+clone allocated during stock font-chain initialization. A cache hit copies the
+already-expanded pixels into LVGL's caller-owned draw buffer, so descriptor
+ownership, cache-entry fields, release callbacks, and the stock cache flush
+remain unchanged. Slot capacity is derived from the largest bitmap in the
+selected size; a typical 28 px chain uses 2,768 bytes including metadata. If
+the authenticated stock allocator fails, returns outside SRAM, or any runtime
+header or slot bound is invalid, the chain attaches the original read-only font
+or the bitmap callback uses the uncached A4 path. The cache has a busy guard so
+re-entrant rendering also falls back instead of sharing mutable slot state.
+
 ## Thai shaping boundary
 
 LVGL decodes UTF-8 and supports font fallback, but it does not provide general

@@ -24,12 +24,16 @@ SPEC = ROOT / "patches" / "thai_patches.json"
 LOAD = 0x437FE0
 LETTER_HELPER_SITE = 0x00491BA4
 DECODE_SLOT_INDIRECT = 0x00491F14
+STOCK_CHAIN_BUILD = 0x00470988
+LV_MALLOC = 0x00458382
 RAM_BASE = 0x20000000
 STACK_TOP = RAM_BASE + 0xFF000
 EMU_DONE = 0x00080000
 
 THAI_START = 0x0E00
 ALT_START = 0xF700
+THAI_RUNTIME_MAGIC = 0x43414854
+RUNTIME_HEADER_BYTES = 80
 
 
 def _main_payload(artifact: bytes) -> bytes:
@@ -55,6 +59,7 @@ class ThaiDevicePathTests(unittest.TestCase):
         cls.payload = _main_payload(ARTIFACT.read_bytes())
         spec = json.loads(SPEC.read_text())
         metadata = spec["metadata"]
+        cls.chain_wrapper_address = int(metadata["chain_wrapper_address"], 16)
         cls.font_blob_bytes = int(metadata["font_blob_bytes"])
         append = next(
             bytes.fromhex(patch["new"])
@@ -63,6 +68,10 @@ class ThaiDevicePathTests(unittest.TestCase):
         )
         start = int(metadata["font_blob_offset_in_append"])
         cls.font_blob = append[start : start + cls.font_blob_bytes]
+        font_blob_offset = cls.payload.find(cls.font_blob)
+        if font_blob_offset < 0 or cls.payload.find(cls.font_blob, font_blob_offset + 1) >= 0:
+            raise AssertionError("font blob must occur exactly once in the main payload")
+        cls.font_blob_address = LOAD + font_blob_offset
 
     def setUp(self) -> None:
         import unicorn.arm_const as arm_const
@@ -151,6 +160,74 @@ class ThaiDevicePathTests(unittest.TestCase):
             )
         self.assertEqual(set(found), set(expected_heights))
         return found
+
+    def glyph_record(self, size_index: int, codepoint: int) -> tuple[int, ...]:
+        _, _, _, glyph_count, record_size, records_offset = struct.unpack_from(
+            "<IHHHHI", self.font_blob
+        )
+        glyph_index = codepoint - THAI_START
+        return struct.unpack_from(
+            "<IHBBbbBB",
+            self.font_blob,
+            records_offset + (size_index * glyph_count + glyph_index) * record_size,
+        )
+
+    def runtime_font(self, layout: dict[str, int], slot_count: int = 4) -> tuple[int, int]:
+        words = struct.unpack("<9I", self.uc.mem_read(layout["address"], 36))
+        size_index = words[8]
+        _, _, _, glyph_count, record_size, records_offset = struct.unpack_from(
+            "<IHHHHI", self.font_blob
+        )
+        slot_bytes = 0
+        for glyph_index in range(glyph_count):
+            _, _, box_w, box_h, _, _, _, present = struct.unpack_from(
+                "<IHBBbbBB",
+                self.font_blob,
+                records_offset + (size_index * glyph_count + glyph_index) * record_size,
+            )
+            if present:
+                slot_bytes = max(slot_bytes, ((box_w + 3) & ~3) * box_h)
+        runtime = self.alloc(RUNTIME_HEADER_BYTES + slot_count * slot_bytes)
+        self.uc.mem_write(runtime, bytes(RUNTIME_HEADER_BYTES + slot_count * slot_bytes))
+        self.uc.mem_write(runtime, struct.pack("<9I", *words))
+        self.uc.mem_write(
+            runtime + 36,
+            struct.pack("<IIHBB", THAI_RUNTIME_MAGIC, 0, slot_bytes, slot_count, 0),
+        )
+        return runtime, slot_bytes
+
+    def render_glyph(
+        self, layout: dict[str, int], font_address: int, codepoint: int
+    ) -> bytes:
+        dsc_buffer = self.alloc(64)
+        self.assertEqual(
+            self.call(layout["dsc"], [font_address, dsc_buffer, codepoint, codepoint]),
+            1,
+        )
+        box_w = struct.unpack_from("<H", self.uc.mem_read(dsc_buffer + 6, 2))[0]
+        box_h = struct.unpack_from("<H", self.uc.mem_read(dsc_buffer + 8, 2))[0]
+        stride = (box_w + 3) & ~3
+        pixels = self.alloc(stride * box_h)
+        self.uc.mem_write(pixels, bytes(stride * box_h))
+        draw_desc = self.alloc(32)
+        handler_table = self.alloc(32)
+        slots = [0] * 8
+        slots[4] = self.flush_stub | 1
+        self.write_words(handler_table, slots)
+        self.uc.mem_write(draw_desc + 8, struct.pack("<H", stride))
+        self.uc.mem_write(draw_desc + 16, struct.pack("<I", pixels))
+        self.uc.mem_write(draw_desc + 24, struct.pack("<I", handler_table))
+        self.call(layout["bitmap"], [dsc_buffer, draw_desc])
+        return b"".join(
+            bytes(self.uc.mem_read(pixels + y * stride, box_w)) for y in range(box_h)
+        )
+
+    def stub_return(self, address: int, value: int) -> None:
+        if address & 2:
+            stub = bytes.fromhex("014870470000") + struct.pack("<I", value)
+        else:
+            stub = bytes.fromhex("00487047") + struct.pack("<I", value)
+        self.uc.mem_write(address, stub)
 
     def test_decode_slot_matches_stock_dispatch(self) -> None:
         storage = self.read_word(DECODE_SLOT_INDIRECT)
@@ -255,6 +332,66 @@ class ThaiDevicePathTests(unittest.TestCase):
                                 sentinel,
                                 f"size {size} codepoint {codepoint:#06x} overran its bitmap buffer",
                             )
+
+    def test_runtime_cache_hit_survives_erased_a4_source(self) -> None:
+        layout = self.font_arrays()[28]
+        runtime, _slot_bytes = self.runtime_font(layout)
+        codepoint = 0x0E01
+        first = self.render_glyph(layout, runtime, codepoint)
+        self.assertTrue(any(first))
+        bitmap_offset, _, _, box_h, _, _, row_bytes, _ = self.glyph_record(3, codepoint)
+        self.uc.mem_write(
+            self.font_blob_address + bitmap_offset,
+            bytes(row_bytes * box_h),
+        )
+        second = self.render_glyph(layout, runtime, codepoint)
+        self.assertEqual(second, first)
+        cached = {self.read_word(runtime + 48 + slot * 8) for slot in range(4)}
+        self.assertIn(codepoint, cached)
+        self.assertEqual(self.uc.mem_read(runtime + 47, 1), b"\0")
+
+    def test_built_chain_wrapper_creates_renderable_runtime_font(self) -> None:
+        layout = self.font_arrays()[28]
+        root = self.alloc(36)
+        tail = self.alloc(36)
+        root_words = [0] * 9
+        root_words[3] = 43
+        root_words[7] = tail
+        self.write_words(root, root_words)
+        self.write_words(tail, [0] * 9)
+        chain = self.alloc(4)
+        self.write_words(chain, [root])
+        runtime = self.alloc(0x4000)
+        self.stub_return(STOCK_CHAIN_BUILD, chain)
+        self.stub_return(LV_MALLOC, runtime)
+        self.assertEqual(self.call(self.chain_wrapper_address, [0, 0]), chain)
+        self.assertEqual(self.read_word(tail + 28), runtime)
+        self.assertEqual(self.read_word(runtime + 36), THAI_RUNTIME_MAGIC)
+        rendered = self.render_glyph(layout, runtime, 0x0E01)
+        self.assertTrue(any(rendered))
+
+    def test_runtime_cache_evicts_least_recently_used_glyph(self) -> None:
+        layout = self.font_arrays()[28]
+        runtime, _slot_bytes = self.runtime_font(layout, slot_count=2)
+        first, second, third = 0x0E01, 0x0E02, 0x0E04
+        self.render_glyph(layout, runtime, first)
+        self.render_glyph(layout, runtime, second)
+        self.render_glyph(layout, runtime, first)
+        self.render_glyph(layout, runtime, third)
+        cached = {self.read_word(runtime + 48 + slot * 8) for slot in range(2)}
+        self.assertEqual(cached, {first, third})
+
+    def test_busy_runtime_falls_back_without_mutating_cache(self) -> None:
+        layout = self.font_arrays()[28]
+        runtime, _slot_bytes = self.runtime_font(layout)
+        self.uc.mem_write(runtime + 47, b"\1")
+        rendered = self.render_glyph(layout, runtime, 0x0E01)
+        self.assertTrue(any(rendered))
+        self.assertEqual(
+            {self.read_word(runtime + 48 + slot * 8) for slot in range(4)},
+            {0},
+        )
+        self.assertEqual(self.uc.mem_read(runtime + 47, 1), b"\1")
 
 
 if __name__ == "__main__":

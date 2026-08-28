@@ -28,6 +28,10 @@ HOOK_SITES = {
     0x00471376: bytes.fromhex("ff f7 07 fb"),
 }
 TEXT_HELPER_SITE = (0x00491BA4, bytes.fromhex("2d e9 f0 41"))
+LV_MALLOC_SITE = (
+    0x00458382,
+    bytes.fromhex("70 b5 04 00 00 25 6c 4e 4f f4 7a 71 30 68 ea f7"),
+)
 
 
 def align_up(value: int, alignment: int = 4) -> int:
@@ -140,6 +144,14 @@ def replace_words(blob: bytearray, old: int, new: int, expected: int) -> None:
 def build_spec(stock: bytes, font_blob: bytes, build: dict[str, object]) -> dict[str, object]:
     if hashlib.sha256(stock).hexdigest() != STOCK_SHA256:
         raise ValueError("stock firmware SHA-256 mismatch")
+    malloc_address, malloc_expected = LV_MALLOC_SITE
+    malloc_offset = malloc_address - G2_FILE_DELTA
+    malloc_actual = bytes(stock[malloc_offset : malloc_offset + len(malloc_expected)])
+    if malloc_actual != malloc_expected:
+        raise ValueError(
+            f"lv_malloc {malloc_address:#x}: expected {malloc_expected.hex()}, "
+            f"got {malloc_actual.hex()}"
+        )
     index, component_offset, old_size = mainapp(stock)
     if component_offset + 128 + old_size != len(stock):
         raise ValueError("main app is not the final component")
@@ -241,6 +253,7 @@ def build_spec(stock: bytes, font_blob: bytes, build: dict[str, object]) -> dict
             "target": "Even Realities G2 2.2.9.22",
             "component_count": struct.unpack_from("<I", stock, 8)[0],
             "lvgl": "9.3.0-dev",
+            "lv_malloc_address": f"0x{malloc_address:08X}",
             "hook_sites": [f"0x{address:08X}" for address in HOOK_SITES],
             "chain_wrapper_address": f"0x{chain_address:08X}",
             "text_helper_hook_site": f"0x{text_site:08X}",

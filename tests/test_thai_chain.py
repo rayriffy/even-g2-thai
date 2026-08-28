@@ -18,11 +18,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 G2FLASH = ROOT.parent / "g2flash"
 SOURCE = ROOT / "patches" / "thai_font.c"
+FONT_BLOB = ROOT / "build" / "thai_font.bin"
 
 CODE_BASE = 0x007D0000
 FLASH_BASE = 0x00400000
 FLASH_SIZE = 0x00400000
 STOCK_CHAIN_BUILD_THUMB = 0x00470989
+LV_MALLOC_THUMB = 0x00458383
 RAM_BASE = 0x20000000
 RAM_SIZE = 0x00100000
 WRITABLE_RAM_BASE = 0x20000000
@@ -30,6 +32,9 @@ WRITABLE_RAM_END = 0x20080000
 STACK_TOP = RAM_BASE + RAM_SIZE - 4
 EMU_DONE = 0x00100000
 DUMMY_CONFIGS = RAM_BASE + 0x1000
+TEST_FONT_DATA = RAM_BASE + 0x40000
+FONT_DATA_MAGIC = 0xA11D0003
+THAI_RUNTIME_MAGIC = 0x43414854
 
 
 def _toolchain_available() -> str | None:
@@ -53,7 +58,12 @@ class ThaiChainEmulationTests(unittest.TestCase):
 
         cls.g2build = g2build
         blob, funcs, _rodata_len = g2build.compile_text(str(SOURCE))
-        cls.blob = blob
+        cls.font_blob = FONT_BLOB.read_bytes()
+        patched_blob = bytes(blob)
+        magic = struct.pack("<I", FONT_DATA_MAGIC)
+        if patched_blob.count(magic) != 1:
+            raise AssertionError("compiled blob must contain one font-data magic word")
+        cls.blob = patched_blob.replace(magic, struct.pack("<I", TEST_FONT_DATA), 1)
         cls.functions = {name: offset for name, offset, _size in funcs}
         for required in ("thai_chain_build", "thai_chain_append"):
             if required not in cls.functions:
@@ -108,8 +118,10 @@ class ThaiChainEmulationTests(unittest.TestCase):
         self.uc.mem_map(FLASH_BASE, FLASH_SIZE, UC_PROT_READ | UC_PROT_EXEC)
         self.uc.mem_map(RAM_BASE, RAM_SIZE, UC_PROT_READ | UC_PROT_WRITE)
         self.uc.mem_write(CODE_BASE, self.blob)
+        self.uc.mem_write(TEST_FONT_DATA, self.font_blob)
         self.ram_next = RAM_BASE + 0x2000
         self.set_stock_return(0)
+        self.set_malloc_return(0)
 
     def font(self, name: str) -> int:
         return CODE_BASE + self.fonts[name]
@@ -119,6 +131,13 @@ class ThaiChainEmulationTests(unittest.TestCase):
         # CPU fetches from the even address; the stub must live there.
         stub = bytes.fromhex("00487047") + struct.pack("<I", value)
         self.uc.mem_write(STOCK_CHAIN_BUILD_THUMB & ~1, stub)
+
+    def set_malloc_return(self, value: int) -> None:
+        # This stock entry is 2 mod 4. LDR literal aligns PC down to a word,
+        # so use imm8=1 and place the value at entry+6 rather than immediately
+        # after BX LR.
+        stub = bytes.fromhex("014870470000") + struct.pack("<I", value)
+        self.uc.mem_write(LV_MALLOC_THUMB & ~1, stub)
 
     def node(self, line_height: int = 0, fallback: int = 0) -> int:
         address = self.ram_next
@@ -180,6 +199,41 @@ class ThaiChainEmulationTests(unittest.TestCase):
         self.assertEqual(returned, chain)
         self.assertEqual(self.read_word(tail + 28), appended)
         self.assertEqual(self.read_word(appended + 28), 0)
+        self.assert_flash_unmodified()
+
+    def test_runtime_cache_font_is_writable_and_idempotent(self) -> None:
+        runtime = self.ram_next
+        self.ram_next += 0x4000
+        self.set_malloc_return(runtime)
+        chain, tail = self.build_three_node_chain()
+        self.set_stock_return(chain)
+        self.call("thai_chain_build")
+        appended = self.read_word(tail + 28)
+        self.assertEqual(appended, runtime)
+        self.assertEqual(self.read_word(runtime + 36), THAI_RUNTIME_MAGIC)
+        self.assertEqual(
+            bytes(self.uc.mem_read(runtime, 36)),
+            bytes(self.uc.mem_read(self.font("thai_font_20"), 36)),
+        )
+        self.set_malloc_return(runtime + 0x2000)
+        self.call("thai_chain_build")
+        self.assertEqual(self.read_word(tail + 28), runtime)
+        self.assertEqual(self.read_word(runtime + 28), 0)
+        self.assert_flash_unmodified()
+
+    def test_allocator_failure_preserves_const_fallback(self) -> None:
+        chain, tail = self.build_three_node_chain()
+        self.set_stock_return(chain)
+        self.set_malloc_return(0)
+        self.call("thai_chain_build")
+        self.assertEqual(self.read_word(tail + 28), self.font("thai_font_20"))
+
+    def test_allocator_outside_writable_ram_preserves_const_fallback(self) -> None:
+        chain, tail = self.build_three_node_chain()
+        self.set_stock_return(chain)
+        self.set_malloc_return(FLASH_BASE + 0x2000)
+        self.call("thai_chain_build")
+        self.assertEqual(self.read_word(tail + 28), self.font("thai_font_20"))
         self.assert_flash_unmodified()
 
     def test_existing_thai_tail_is_left_alone(self) -> None:
