@@ -48,6 +48,30 @@ static const uint8_t a4_to_a8[16] = {
     136u, 153u, 170u, 187u, 204u, 221u, 238u, 255u,
 };
 
+#define A4_TO_A8_PAIR(first, second) \
+    ((uint16_t)((uint16_t)(first) * 17u | ((uint16_t)(second) * 17u << 8)))
+#define A4_TO_A8_PAIR_ROW(first) \
+    A4_TO_A8_PAIR(first, 0u), A4_TO_A8_PAIR(first, 1u), \
+    A4_TO_A8_PAIR(first, 2u), A4_TO_A8_PAIR(first, 3u), \
+    A4_TO_A8_PAIR(first, 4u), A4_TO_A8_PAIR(first, 5u), \
+    A4_TO_A8_PAIR(first, 6u), A4_TO_A8_PAIR(first, 7u), \
+    A4_TO_A8_PAIR(first, 8u), A4_TO_A8_PAIR(first, 9u), \
+    A4_TO_A8_PAIR(first, 10u), A4_TO_A8_PAIR(first, 11u), \
+    A4_TO_A8_PAIR(first, 12u), A4_TO_A8_PAIR(first, 13u), \
+    A4_TO_A8_PAIR(first, 14u), A4_TO_A8_PAIR(first, 15u)
+static const uint16_t a4_to_a8_pair[256] = {
+    A4_TO_A8_PAIR_ROW(0u), A4_TO_A8_PAIR_ROW(1u),
+    A4_TO_A8_PAIR_ROW(2u), A4_TO_A8_PAIR_ROW(3u),
+    A4_TO_A8_PAIR_ROW(4u), A4_TO_A8_PAIR_ROW(5u),
+    A4_TO_A8_PAIR_ROW(6u), A4_TO_A8_PAIR_ROW(7u),
+    A4_TO_A8_PAIR_ROW(8u), A4_TO_A8_PAIR_ROW(9u),
+    A4_TO_A8_PAIR_ROW(10u), A4_TO_A8_PAIR_ROW(11u),
+    A4_TO_A8_PAIR_ROW(12u), A4_TO_A8_PAIR_ROW(13u),
+    A4_TO_A8_PAIR_ROW(14u), A4_TO_A8_PAIR_ROW(15u),
+};
+#undef A4_TO_A8_PAIR_ROW
+#undef A4_TO_A8_PAIR
+
 /* Exact 32-bit lv_font_t word layout for the authenticated LVGL 9.3 build. */
 #define FONT_WORDS(line_height, base_line, index) \
     {FONT_DSC_MAGIC, FONT_BITMAP_MAGIC, 0u, line_height, base_line, 0u, 0u, 0u, index}
@@ -154,10 +178,19 @@ const void *thai_get_glyph_bitmap(void *glyph_dsc, void *draw_buf) {
         const uint8_t *row = source + y * glyph->row_bytes;
         uint8_t *out = target + y * stride;
         uint32_t pairs = glyph->box_w >> 1;
-        while(pairs--) {
-            uint8_t packed = *row++;
-            *out++ = a4_to_a8[packed >> 4];
-            *out++ = a4_to_a8[packed & 0x0Fu];
+        if(((uintptr_t)out & 1u) == 0u) {
+            uint16_t *pair_out = (uint16_t *)(uintptr_t)out;
+            while(pairs--) {
+                *pair_out++ = a4_to_a8_pair[*row++];
+            }
+            out = (uint8_t *)(uintptr_t)pair_out;
+        }
+        else {
+            while(pairs--) {
+                uint8_t packed = *row++;
+                *out++ = a4_to_a8[packed >> 4];
+                *out++ = a4_to_a8[packed & 0x0Fu];
+            }
         }
         if(glyph->box_w & 1u) {
             *out = a4_to_a8[*row >> 4];
@@ -184,33 +217,28 @@ static int is_upper_mark(uint32_t codepoint) {
            codepoint == 0x0E4Du || codepoint == 0x0E4Eu;
 }
 
-static uint32_t previous_codepoint(stock_decode_fn decode, const char *text,
-                                   uint32_t current_offset) {
-    uint32_t cursor = 0;
-    uint32_t previous = 0;
-    while(cursor < current_offset) {
-        uint32_t before = cursor;
-        previous = decode(text, &cursor);
-        if(!previous || cursor <= before || cursor > current_offset) return 0;
-    }
-    return cursor == current_offset ? previous : 0;
-}
-
 __attribute__((used, noinline))
 void thai_text_encoded_letter_next_2(const char *text, uint32_t *letter,
                                      uint32_t *letter_next, uint32_t *offset) {
     stock_decode_fn decode = stock_decoder();
     uint32_t local_offset = 0;
     uint32_t *active_offset = offset ? offset : &local_offset;
-    uint32_t current_offset = *active_offset;
     uint32_t current = 0;
     uint32_t next = 0;
     if(decode) current = decode(text, active_offset);
     if(decode && current) next = decode(text + *active_offset, 0);
     if(current >= TONE_MARK_START && current < TONE_MARK_START + ALT_COUNT) {
         int raise_tone = next == SARA_AM;
-        if(!raise_tone && decode && current_offset) {
-            raise_tone = is_upper_mark(previous_codepoint(decode, text, current_offset));
+        if(!raise_tone && *active_offset >= 6u) {
+            const uint8_t *previous = (const uint8_t *)text + *active_offset - 6u;
+            if(previous[0] == 0xE0u &&
+               previous[1] >= 0xB8u && previous[1] <= 0xB9u &&
+               (previous[2] & 0xC0u) == 0x80u) {
+                uint32_t codepoint = 0x0E00u +
+                                     ((uint32_t)(previous[1] - 0xB8u) << 6) +
+                                     (uint32_t)(previous[2] - 0x80u);
+                raise_tone = is_upper_mark(codepoint);
+            }
         }
         if(raise_tone) current = ALT_START + current - TONE_MARK_START;
     }

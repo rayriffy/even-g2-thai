@@ -19,6 +19,7 @@ from font_blob import (
     THAI_COUNT,
     TONE_MARKS,
     VALID_CODEPOINTS,
+    _thin_mask,
 )
 from generate_patch import encode_bl, encode_bw
 from render_preview import shape_for_preview
@@ -46,6 +47,21 @@ class ThaiPatchTests(unittest.TestCase):
         )
         self.assertEqual((magic, version, sizes, glyphs, record_size), (MAGIC, 2, 8, 132, RECORD.size))
         self.assertEqual(records_offset, HEADER.size + sizes * SIZE_RECORD.size)
+
+    def test_thin_mask_erodes_stroke_geometry(self) -> None:
+        full_square = bytes([255] * 25)
+        self.assertEqual(
+            _thin_mask(full_square, 5, 5, 1),
+            bytes(
+                [
+                    0, 0, 0, 0, 0,
+                    0, 255, 255, 255, 0,
+                    0, 255, 255, 255, 0,
+                    0, 255, 255, 255, 0,
+                    0, 0, 0, 0, 0,
+                ]
+            ),
+        )
 
     def test_expected_thai_coverage(self) -> None:
         _, _, sizes, glyphs, _, records_offset = HEADER.unpack_from(self.font_blob)
@@ -215,8 +231,10 @@ class ThaiPatchTests(unittest.TestCase):
         self.assertNotIn("STOCK_UTF8_NEXT_THUMB", source)
         self.assertIn("uint32_t *active_offset = offset ? offset : &local_offset;", source)
         self.assertIn("next = decode(text + *active_offset, 0);", source)
-        self.assertIn("if(!raise_tone && decode && current_offset)", source)
+        self.assertIn("if(!raise_tone && *active_offset >= 6u)", source)
+        self.assertNotIn("previous_codepoint(", source)
         self.assertIn("a4_to_a8[16]", source)
+        self.assertIn("a4_to_a8_pair[256]", source)
 
     def test_chain_append_only_writes_writable_ram(self) -> None:
         source = (ROOT / "patches/thai_font.c").read_text()

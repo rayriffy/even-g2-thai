@@ -11,13 +11,14 @@ import sys
 from pathlib import Path
 
 import PIL
-from PIL import ImageFont, features
+from PIL import Image, ImageFont, features
 
 MAGIC = 0x49414854  # "THAI" in little endian
 VERSION = 2
 PILLOW_VERSION = "11.3.0"
 SIZES = (16, 20, 24, 28, 32, 36, 40, 48)
 RASTER_SCALE = 2
+THIN_SUPERSAMPLE = 4
 THAI_START = 0x0E00
 THAI_COUNT = 0x80
 ALT_START = 0xF700
@@ -160,19 +161,42 @@ def _thin_mask(mask: object, width: int, height: int, edges: int) -> bytes:
         for y in range(height):
             for x in range(width):
                 index = y * width + x
-                if (
-                    source[index] < 128
-                    or x == 0
-                    or y == 0
-                    or x + 1 == width
-                    or y + 1 == height
-                    or source[index - 1] < 128
-                    or source[index + 1] < 128
-                    or source[index - width] < 128
-                    or source[index + width] < 128
-                ):
-                    pixels[index] = min(source[index], 96)
+                neighbors = [source[index]]
+                for dy in (-1, 0, 1):
+                    for dx in (-1, 0, 1):
+                        if dx == 0 and dy == 0:
+                            continue
+                        neighbor_x = x + dx
+                        neighbor_y = y + dy
+                        if 0 <= neighbor_x < width and 0 <= neighbor_y < height:
+                            neighbors.append(source[neighbor_y * width + neighbor_x])
+                        else:
+                            neighbors.append(0)
+                pixels[index] = min(neighbors)
     return bytes(pixels)
+
+
+def _downsample_thin_raster(
+    mask: bytes, width: int, height: int, left: int, top: int, advance: int, scale: int
+) -> tuple[bytes, int, int, int, int, int]:
+    if scale == 1:
+        return mask, width, height, left, top, advance
+    output_left = left // scale
+    output_top = top // scale
+    output_right = -(- (left + width) // scale)
+    output_bottom = -(- (top + height) // scale)
+    output_width = output_right - output_left
+    output_height = output_bottom - output_top
+    image = Image.frombytes("L", (width, height), mask)
+    output = image.resize((output_width, output_height), Image.Resampling.LANCZOS)
+    return (
+        output.tobytes(),
+        output_width,
+        output_height,
+        output_left,
+        output_top,
+        round(advance / scale),
+    )
 
 
 def build_blob(font_path: Path, thin_edges: int = 0) -> tuple[bytes, dict[str, object]]:
@@ -190,9 +214,12 @@ def build_blob(font_path: Path, thin_edges: int = 0) -> tuple[bytes, dict[str, o
     bitmap_offset = records_offset + RECORD.size * len(SIZES) * GLYPH_COUNT
 
     for size in SIZES:
-        raster_size = size * RASTER_SCALE
+        thin_scale = THIN_SUPERSAMPLE if thin_edges else 1
+        raster_size = size * RASTER_SCALE * thin_scale
         font = _font(font_path, raster_size)
         ascent, descent = font.getmetrics()
+        ascent = round(ascent / thin_scale)
+        descent = round(descent / thin_scale)
         base_cell = round(font.getlength("ก"))
         records: list[tuple[int, int, int, int, int, int, int, int]] = []
         rendered: dict[
@@ -219,7 +246,16 @@ def build_blob(font_path: Path, thin_edges: int = 0) -> tuple[bytes, dict[str, o
                 width, height = mask.size
                 advance = round(font.getlength(chr(codepoint)))
             if thin_edges:
-                mask = _thin_mask(mask, width, height, thin_edges)
+                erosion_pixels = thin_edges * (THIN_SUPERSAMPLE // 2)
+                while erosion_pixels:
+                    candidate = _thin_mask(mask, width, height, erosion_pixels)
+                    if any(candidate):
+                        mask = candidate
+                        break
+                    erosion_pixels -= 1
+                mask, width, height, left, top, advance = _downsample_thin_raster(
+                    bytes(mask), width, height, left, top, advance, thin_scale
+                )
             bottom = top + height
             packed, row_bytes = _pack_a4(mask, width, height)
             pixels = bytes(mask)
@@ -312,7 +348,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("font", type=Path)
     parser.add_argument("output", type=Path)
-    parser.add_argument("--thin", type=int, default=0, choices=(0, 1))
+    parser.add_argument("--thin", type=int, default=0, choices=(0, 1, 2))
     args = parser.parse_args()
     blob, report = build_blob(args.font, thin_edges=args.thin)
     args.output.parent.mkdir(parents=True, exist_ok=True)

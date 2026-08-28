@@ -208,20 +208,6 @@ class ThaiDevicePathTests(unittest.TestCase):
                     box_w = struct.unpack_from("<H", self.uc.mem_read(dsc_buffer + 6, 2))[0]
                     box_h = struct.unpack_from("<H", self.uc.mem_read(dsc_buffer + 8, 2))[0]
                     self.assertGreater(box_w, 0)
-                    stride = (box_w + 3) & ~3
-                    pixels = self.alloc(stride * box_h)
-                    guard_after = self.alloc(8)
-                    sentinel = 0xA5A5A5A5
-                    self.write_words(guard_after, [sentinel, sentinel])
-                    draw_desc = self.alloc(32)
-                    handler_table = self.alloc(32)
-                    slots = [0] * 8
-                    slots[4] = self.flush_stub | 1
-                    self.write_words(handler_table, slots)
-                    self.uc.mem_write(draw_desc + 8, struct.pack("<H", stride))
-                    self.uc.mem_write(draw_desc + 16, struct.pack("<I", pixels))
-                    self.uc.mem_write(draw_desc + 24, struct.pack("<I", handler_table))
-                    self.call(layout["bitmap"], [dsc_buffer, draw_desc])
                     _, _, size_count, glyph_count, _, records_offset = struct.unpack_from(
                         "<IHHHHI", self.font_blob
                     )
@@ -233,23 +219,42 @@ class ThaiDevicePathTests(unittest.TestCase):
                     bitmap_offset, _, _, _, _, _, row_bytes, _ = struct.unpack_from(
                         "<IHBBbbBB", self.font_blob, record_offset
                     )
-                    for y in range(box_h):
-                        expected = bytearray()
-                        row = self.font_blob[
-                            bitmap_offset + y * row_bytes : bitmap_offset + (y + 1) * row_bytes
-                        ]
-                        for packed in row:
-                            expected.extend(((packed >> 4) * 17, (packed & 0x0F) * 17))
-                        self.assertEqual(
-                            self.uc.mem_read(pixels + y * stride, box_w),
-                            bytes(expected[:box_w]),
-                            f"size {size} codepoint {codepoint:#06x} A4 expansion drifted",
-                        )
-                    self.assertEqual(
-                        self.read_word(guard_after),
-                        sentinel,
-                        f"size {size} codepoint {codepoint:#06x} overran its bitmap buffer",
-                    )
+                    for target_offset, stride in (
+                        (0, (box_w + 3) & ~3),
+                        (1, box_w if box_w & 1 else box_w + 1),
+                    ):
+                        with self.subTest(target_offset=target_offset, stride=stride):
+                            pixels = self.alloc(target_offset + stride * box_h)
+                            target = pixels + target_offset
+                            guard_after = self.alloc(8)
+                            sentinel = 0xA5A5A5A5
+                            self.write_words(guard_after, [sentinel, sentinel])
+                            draw_desc = self.alloc(32)
+                            handler_table = self.alloc(32)
+                            slots = [0] * 8
+                            slots[4] = self.flush_stub | 1
+                            self.write_words(handler_table, slots)
+                            self.uc.mem_write(draw_desc + 8, struct.pack("<H", stride))
+                            self.uc.mem_write(draw_desc + 16, struct.pack("<I", target))
+                            self.uc.mem_write(draw_desc + 24, struct.pack("<I", handler_table))
+                            self.call(layout["bitmap"], [dsc_buffer, draw_desc])
+                            for y in range(box_h):
+                                expected = bytearray()
+                                row = self.font_blob[
+                                    bitmap_offset + y * row_bytes : bitmap_offset + (y + 1) * row_bytes
+                                ]
+                                for packed in row:
+                                    expected.extend(((packed >> 4) * 17, (packed & 0x0F) * 17))
+                                self.assertEqual(
+                                    self.uc.mem_read(target + y * stride, box_w),
+                                    bytes(expected[:box_w]),
+                                    f"size {size} codepoint {codepoint:#06x} A4 expansion drifted",
+                                )
+                            self.assertEqual(
+                                self.read_word(guard_after),
+                                sentinel,
+                                f"size {size} codepoint {codepoint:#06x} overran its bitmap buffer",
+                            )
 
 
 if __name__ == "__main__":

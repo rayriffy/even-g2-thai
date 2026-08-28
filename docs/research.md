@@ -49,21 +49,26 @@ The fallback stores `2005_iannnnnAMD` alpha masks at eight stock target sizes,
 rasterized at 2× source resolution because this font's Thai glyph design is
 visually about half the requested pixel size. Host-side Raqm shaping extracts
 combining marks without the font's dotted-circle scaffolds and synthesizes
-U+0E33 SARA AM from shaped U+0E4D nikhahit plus U+0E32 sara aa. One source
-pixel of outer-edge alpha is softened to reduce the font's visual weight while
-keeping strokes continuous. Its callbacks return LVGL 9.3 glyph descriptors
-and expand packed A4 pixels into LVGL's A8 draw buffer. The callback invokes
-the active draw-buffer handler's cache flush, matching LVGL's built-in
-bitmap-font path.
+U+0E33 SARA AM from shaped U+0E4D nikhahit plus U+0E32 sara aa. The production
+raster is first supersampled from the source outline, then geometrically
+eroded and downsampled back to device size. This creates a fractional stroke
+contraction instead of dimming the original outline. `--thin 1` removes half a
+device pixel from each contour; `--thin 2` removes one, falling back by a
+high-resolution pixel only when a tiny mark would disappear. Production stays
+at `--thin 1` unless a preview is visually approved. Its callbacks return LVGL
+9.3 glyph descriptors and expand packed A4 pixels into LVGL's A8 draw buffer.
+The callback invokes the active draw-buffer handler's cache flush, matching
+LVGL's built-in bitmap-font path.
 
 ## Rendering cost
 
 The firmware converts each embedded glyph from packed A4 to LVGL A8 in the
-draw buffer. The hot loop expands two output pixels per packed byte through a
-16-entry lookup table, preserving the exact A8 values and cache-flush call
-while avoiding per-pixel branches and multiplication. UTF-8 backtracking for a
-preceding mark runs only after the current codepoint is known to be a tone
-mark, rather than on every decoded character.
+draw buffer. Aligned rows expand two output pixels per packed byte with a
+single 16-bit store from a 256-entry pair lookup; unusual unaligned rows retain
+the byte-safe lookup path. Both preserve exact A8 values and the mandatory
+cache flush. The only context-sensitive decoder case—tone marks after upper
+Thai marks—now identifies the immediately preceding fixed-width Thai UTF-8
+sequence directly instead of re-decoding the text prefix.
 
 ## Thai shaping boundary
 
