@@ -1,4 +1,4 @@
-/* LVGL 9.3 Thai fallback for Even Realities G2 firmware 2.2.9.22. */
+/* LVGL 9.3 Thai fallback for Even Realities G2 firmware 2.2.10.10. */
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -14,15 +14,15 @@
 #define FONT_BITMAP_MAGIC 0xA11D0002u
 #define FONT_DATA_MAGIC 0xA11D0003u
 #define LV_FONT_GLYPH_FORMAT_A8 0x08u
-#define STOCK_CHAIN_BUILD_THUMB 0x00470989u
-#define LV_MALLOC_THUMB 0x00458383u
+#define STOCK_CHAIN_BUILD_THUMB 0x00470F6Du
+#define LV_MALLOC_THUMB 0x00458703u
 /* The stock letter helper loads its UTF-8 decoder through the double pointer
-   at 0x00491F14 (slot address, then function pointer) so it always matches
+   at 0x00493244 (slot address, then function pointer) so it always matches
    the firmware's active text encoder. Calling any hardcoded entry instead
-   breaks that contract: the helper at 0x00491E24 dereferences its offset
+   breaks that contract: the old 2.2.9.22 helper at 0x00491E24 dereferences its offset
    argument unconditionally and faults when the lookahead pass passes NULL,
    which is exactly how the stock helper invokes its decoder. */
-#define STOCK_DECODE_SLOT_INDIRECT 0x00491F14u
+#define STOCK_DECODE_SLOT_INDIRECT 0x00493244u
 #define WRITABLE_RAM_BASE 0x20000000u
 #define WRITABLE_RAM_END 0x20080000u
 #define GLYPH_DSC_SIZE 32u

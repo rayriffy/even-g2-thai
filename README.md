@@ -1,6 +1,6 @@
 # g2-thai
 
-`g2-thai` patches the Even Realities G2 2.2.9.22 firmware with a Thai bitmap
+`g2-thai` patches the Even Realities G2 2.2.10.10 firmware with a Thai bitmap
 fallback font. It keeps the stock LVGL/FreeType font chains for every existing
 glyph and adds Thai only when the stock fonts report a miss.
 
@@ -9,7 +9,7 @@ vendor image from Even's CDN, verifies its SHA-256, applies a committed binary
 patch, verifies every EVENOTA checksum, and writes:
 
 ```text
-build/g2_2.2.9.22_thai.bin
+build/g2_2.2.10.10_thai.bin
 ```
 
 ## Build
@@ -67,8 +67,14 @@ Hardware flashes use the charging-case USB writer from AM-Guru's
 `third_party/evenRealities-webflasher` and carried as
 [`patches/webflasher_case_usb_thai.patch`](patches/webflasher_case_usb_thai.patch)
 on top of pinned upstream commit `c437fdf`. The patch adds an exact-hash
-Case-USB pin for this artifact (`localTempleFlashTargets.js`); direct Bluetooth
-flashing stays rejected.
+Case-USB pins for this artifact and its matching stock rollback image
+(`localTempleFlashTargets.js`); direct Bluetooth flashing stays rejected.
+
+The companion remains pinned to the reviewed revision with our local-file
+support. SybilSight's later removal of custom firmware support is not imported.
+Its September 8 archive supplied the new stock provenance, independently
+verified against Even's CDN; see [`2.2.10.10 rebase evidence`](docs/rebases/2.2.10.10.md).
+Load either 2.2.10.10 image from disk; the companion's hosted catalog is older.
 
 ```sh
 make webflasher
@@ -81,6 +87,11 @@ payload hashes. `make webflasher-serve` installs the committed WebFlasher
 dependencies with `npm ci` before starting Vite, so a fresh checkout does not
 fail with `vite: command not found`. Run the vendored project's own tests and
 production build inside the submodule before touching hardware.
+
+After a future patch change, run `make patch`, update the local bundle/main
+pins, regenerate `patches/webflasher_case_usb_thai.patch` including its new-file
+diff, then run `make webflasher` and `node tools/check_webflasher_artifacts.mjs`.
+Unknown custom files still fail closed; each build needs its own exact pins.
 
 ## Scope and current boundary
 

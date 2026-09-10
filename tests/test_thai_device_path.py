@@ -18,14 +18,14 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-ARTIFACT = ROOT / "build" / "g2_2.2.9.22_thai.bin"
+ARTIFACT = ROOT / "build" / "g2_2.2.10.10_thai.bin"
 SPEC = ROOT / "patches" / "thai_patches.json"
 
 LOAD = 0x437FE0
-LETTER_HELPER_SITE = 0x00491BA4
-DECODE_SLOT_INDIRECT = 0x00491F14
-STOCK_CHAIN_BUILD = 0x00470988
-LV_MALLOC = 0x00458382
+LETTER_HELPER_SITE = 0x00492ED4
+DECODE_SLOT_INDIRECT = 0x00493244
+STOCK_CHAIN_BUILD = 0x00470F6C
+LV_MALLOC = 0x00458702
 RAM_BASE = 0x20000000
 STACK_TOP = RAM_BASE + 0xFF000
 EMU_DONE = 0x00080000
@@ -232,7 +232,8 @@ class ThaiDevicePathTests(unittest.TestCase):
     def test_decode_slot_matches_stock_dispatch(self) -> None:
         storage = self.read_word(DECODE_SLOT_INDIRECT)
         decoder = self.read_word(storage)
-        self.assertTrue(decoder & 1, "decoder pointer must be a Thumb entry")
+        self.assertEqual(storage, 0x007BD720)
+        self.assertEqual(decoder, 0x00492FF7)
 
     def test_ascii_decodes_through_hook(self) -> None:
         text = self.utf8("abc")

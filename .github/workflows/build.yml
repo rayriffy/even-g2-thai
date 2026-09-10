@@ -42,18 +42,18 @@ jobs:
 
       - name: Record artifact hashes
         run: |
-          sha256sum build/g2_2.2.9.22_thai.bin
+          sha256sum build/g2_2.2.10.10_thai.bin
           sha256sum patches/thai_patches.json
 
       - name: Upload firmware artifact
         uses: actions/upload-artifact@v4
         with:
-          name: g2-thai-2.2.9.22-${{ github.sha }}
+          name: g2-thai-2.2.10.10-${{ github.sha }}
           if-no-files-found: error
           retention-days: 90
           path: |
-            build/g2_2.2.9.22_thai.bin
+            build/g2_2.2.10.10_thai.bin
             build/thai-preview.png
             patches/thai_patches.json
-            docs/rebases/2.2.9.22.json
-            docs/rebases/2.2.9.22.md
+            docs/rebases/2.2.10.10.json
+            docs/rebases/2.2.10.10.md

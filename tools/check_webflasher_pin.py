@@ -3,7 +3,7 @@
 
 The charging-case writer refuses any file whose whole-bundle or Apollo-main
 digest differs from src/lib/localTempleFlashTargets.js. This check keeps that
-pin in lockstep with build/g2_2.2.9.22_thai.bin so a rebuilt firmware can never
+pin in lockstep with build/g2_2.2.10.10_thai.bin so a rebuilt firmware can never
 silently fall back to a stale pin."""
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-ARTIFACT = ROOT / "build" / "g2_2.2.9.22_thai.bin"
+ARTIFACT = ROOT / "build" / "g2_2.2.10.10_thai.bin"
 PIN = (
     ROOT
     / "third_party"

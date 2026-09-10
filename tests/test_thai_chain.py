@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import shutil
 import struct
 import sys
@@ -17,15 +18,15 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-G2FLASH = ROOT.parent / "g2flash"
+G2FLASH = Path(os.environ.get("G2FLASH_ROOT", ROOT.parent / "g2flash"))
 SOURCE = ROOT / "patches" / "thai_font.c"
 PATCH_SPEC = ROOT / "patches" / "thai_patches.json"
 
 CODE_BASE = 0x007D0000
 FLASH_BASE = 0x00400000
 FLASH_SIZE = 0x00400000
-STOCK_CHAIN_BUILD_THUMB = 0x00470989
-LV_MALLOC_THUMB = 0x00458383
+STOCK_CHAIN_BUILD_THUMB = 0x00470F6D
+LV_MALLOC_THUMB = 0x00458703
 RAM_BASE = 0x20000000
 RAM_SIZE = 0x00100000
 WRITABLE_RAM_BASE = 0x20000000

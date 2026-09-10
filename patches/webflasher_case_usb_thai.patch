@@ -1,16 +1,19 @@
 diff --git a/README.md b/README.md
-index 3ff34bf..effda9e 100644
+index 3ff34bf..ecd448d 100644
 --- a/README.md
 +++ b/README.md
-@@ -977,6 +977,12 @@ This is an application-alive reinstall path. If the temple no longer answers
+@@ -977,6 +977,15 @@ This is an application-alive reinstall path. If the temple no longer answers
  the version preflight, do not attempt it repeatedly: use a separately proven
  SBL/MRAM-recovery or SWD route.
  
-+The local Thai G2 2.2.9.22 build is a narrow exception to the official-bundle
++The local Thai G2 2.2.10.10 build is a narrow exception to the official-bundle
 +rule. The browser accepts only its exact whole-bundle SHA-256 and Apollo-main
 +SHA-256 through the Case USB writer; it cannot stage the Case component and is
 +blocked from Bluetooth transfer. Its Case-USB transfer is hash-pinned but has
 +not yet been validated on hardware.
++
++The original 2.2.10.10 CDN bundle is also pinned for local Case USB rollback.
++Neither local image depends on availability in the hosted firmware catalog.
 +
  ### Direct Bluetooth update
  
@@ -89,7 +92,7 @@ index 47afe52..7e695be 100644
      if (!hash || servedHashes.has(hash)) return false;
      return compareFirmwareVersions(target?.version, newestServed) > 0;
 diff --git a/src/lib/firmware.js b/src/lib/firmware.js
-index 642d29d..0e29e6c 100644
+index 642d29d..d4ddb4f 100644
 --- a/src/lib/firmware.js
 +++ b/src/lib/firmware.js
 @@ -1,4 +1,5 @@
@@ -107,8 +110,8 @@ index 642d29d..0e29e6c 100644
 +  );
 +  if (localPinned) {
 +    return {
-+      channel: "custom",
-+      trust: "local-hash-pinned",
++      channel: localPinned.channel ?? "custom",
++      trust: localPinned.channel === "official" ? "official-pinned" : "local-hash-pinned",
 +      label: localPinned.label,
 +      version: localPinned.version,
 +      baseVersion: localPinned.baseVersion,
@@ -134,34 +137,6 @@ index 930b49b..7a95cf4 100644
    const components = firmware.componentImages;
    if (!Array.isArray(components) || components.length !== EXPECTED_COMPONENTS.length) {
      throw new Error(
-diff --git a/src/lib/localTempleFlashTargets.js b/src/lib/localTempleFlashTargets.js
-new file mode 100644
-index 0000000..3e96428
---- /dev/null
-+++ b/src/lib/localTempleFlashTargets.js
-@@ -0,0 +1,22 @@
-+// Locally supplied firmware that is intentionally allowed only through the
-+// charging-case writer. These pins are independent of the hosted catalog: a
-+// local file must match the whole-bundle and Apollo-main digests below.
-+
-+export const LOCAL_G2_TEMPLE_FLASH_TARGETS = Object.freeze([
-+  Object.freeze({
-+    imageSha256: "749cf09ceea707620a79b029a1f02e0101b1d7bb44d09d9b700889d77307961b",
-+    mainSha256: "f4b1a36f7d2e1837def914c8b8eefc8c6cae66bea6fc44097f1fcf925d9b0e3c",
-+    mainBytes: 3834766,
-+    version: "2.2.9.22",
-+    reportedVersion: "2.2.9.22",
-+    label: "Thai G2 2.2.9.22 · 2005_iannnnnAMD · local Case USB only",
-+    hardwareValidated: false,
-+    localOnly: true,
-+    baseVersion: "2.2.9.22",
-+    capabilities: [
-+      "Uses the stock G2 2.2.9.22 container with a Thai SARA AM tone-mark positioning patch.",
-+      "Accepted only through the charging-case USB writer; direct Bluetooth update remains blocked.",
-+      "Hash-pinned and structurally verified, but not yet validated by a Case-USB hardware transfer.",
-+    ],
-+  }),
-+]);
 diff --git a/src/lib/templeFlashTargets.js b/src/lib/templeFlashTargets.js
 index 9f9dc03..c56408b 100644
 --- a/src/lib/templeFlashTargets.js
@@ -211,7 +186,7 @@ index 7472727..8d2f58c 100644
    const catalog = JSON.parse(
      await readFile(
 diff --git a/tests/firmware.test.mjs b/tests/firmware.test.mjs
-index aa6636f..6cc2bd5 100644
+index aa6636f..f95ee21 100644
 --- a/tests/firmware.test.mjs
 +++ b/tests/firmware.test.mjs
 @@ -32,6 +32,7 @@ import {
@@ -222,16 +197,25 @@ index aa6636f..6cc2bd5 100644
  import {
    POGO_BRIDGE_OBSERVED_33_SHA256,
    POGO_BRIDGE_SHA256,
-@@ -193,6 +194,14 @@ test("recognizes the exact reviewed CFW trust pin", () => {
+@@ -193,6 +194,23 @@ test("recognizes the exact reviewed CFW trust pin", () => {
    );
  });
  
-+test("recognizes the exact local Thai G2 2.2.9.22 pin", () => {
++test("recognizes the exact local Thai G2 2.2.10.10 pin", () => {
 +  const thai = LOCAL_G2_TEMPLE_FLASH_TARGETS[0];
 +  const trust = classifyG2Firmware(thai.imageSha256);
 +  assert.equal(trust.trust, "local-hash-pinned");
-+  assert.equal(trust.baseVersion, "2.2.9.22");
++  assert.equal(trust.baseVersion, "2.2.10.10");
 +  assert.equal(trust.capabilities.some((value) => /Thai SARA AM/i.test(value)), true);
++});
++
++test("recognizes local 2.2.10.10 rollback as official stock", () => {
++  const stock = LOCAL_G2_TEMPLE_FLASH_TARGETS.find((target) => target.channel === "official");
++  const trust = classifyG2Firmware(stock.imageSha256);
++  assert.equal(trust.channel, "official");
++  assert.equal(trust.trust, "official-pinned");
++  assert.equal(trust.version, "2.2.10.10");
++  assert.equal(stock.localOnly, true);
 +});
 +
  test("recognizes the g2flash-based G2 2.2.6.11 trust pin", () => {
@@ -308,3 +292,46 @@ index 3ad1983..fa62e35 100644
    assert.deepEqual(
      TEMPLE_FLASH_TARGETS.map(({ label, ...rest }) => rest),
      expected,
+diff --git a/src/lib/localTempleFlashTargets.js b/src/lib/localTempleFlashTargets.js
+new file mode 100644
+index 0000000..f5d8372
+--- /dev/null
++++ b/src/lib/localTempleFlashTargets.js
+@@ -0,0 +1,37 @@
++// Locally supplied firmware that is intentionally allowed only through the
++// charging-case writer. These pins are independent of the hosted catalog: a
++// local file must match the whole-bundle and Apollo-main digests below.
++
++export const LOCAL_G2_TEMPLE_FLASH_TARGETS = Object.freeze([
++  Object.freeze({
++    imageSha256: "cad29efb784121ece18207989bb7f9d57e2ba4a1349883dd3689f89de5654308",
++    mainSha256: "050863006aef8c0d47a730c51410c192155b39c04bbb106c05d1c7a424e9711b",
++    mainBytes: 3851366,
++    version: "2.2.10.10",
++    reportedVersion: "2.2.10.10",
++    label: "Thai G2 2.2.10.10 · 2005_iannnnnAMD · local Case USB only",
++    hardwareValidated: false,
++    localOnly: true,
++    baseVersion: "2.2.10.10",
++    capabilities: [
++      "Uses the stock G2 2.2.10.10 container with a Thai SARA AM tone-mark positioning patch.",
++      "Accepted only through the charging-case USB writer; direct Bluetooth update remains blocked.",
++      "Hash-pinned and structurally verified, but not yet validated by a Case-USB hardware transfer.",
++    ],
++  }),
++  // Same-version rollback, loaded from the verified local CDN download.
++  // Keep it independent of this older companion's hosted stock catalog.
++  Object.freeze({
++    imageSha256: "927879057685a4147c6ba1fe33e5f3740d3cc48f87141a9039204d94516e65b8",
++    mainSha256: "6ff47ca0cf9efa222e4e96bff85a87921a0e2fff657d7b51aab7a1a8da7d847b",
++    mainBytes: 3713884,
++    version: "2.2.10.10",
++    reportedVersion: "2.2.10.10",
++    label: "Stock Even Realities G2 2.2.10.10 · local Case USB rollback",
++    channel: "official",
++    hardwareValidated: false,
++    localOnly: true,
++    baseVersion: "2.2.10.10",
++    capabilities: ["Original Even CDN image for same-version Case USB rollback."],
++  }),
++]);

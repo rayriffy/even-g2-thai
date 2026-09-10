@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "target_version": "2.2.10.10",
+  "stock_sha256": "927879057685a4147c6ba1fe33e5f3740d3cc48f87141a9039204d94516e65b8",
+  "stock_url": "https://cdn.evenreal.co/firmware/5d2abaf086ad7cc4709cad679b7b24d1.bin",
+  "stock_size": 4493065,
+  "stock_md5": "5d2abaf086ad7cc4709cad679b7b24d1",
+  "archive_commit": "2144c007ee6f97d23eac3b359ab0fded2355e716",
+  "archive_repository": "AM-Guru/SybilSight-webflasher",
+  "patched_sha256": "cad29efb784121ece18207989bb7f9d57e2ba4a1349883dd3689f89de5654308",
+  "patched_size": 4630547,
+  "patched_main_sha256": "050863006aef8c0d47a730c51410c192155b39c04bbb106c05d1c7a424e9711b",
+  "patched_main_size": 3851366,
+  "component_count": 6,
+  "hardware_validated": false,
+  "file_delta": "0x00379C33",
+  "payload_file_offset": 779181,
+  "decoder_dispatch": {
+    "literal": "0x00493244",
+    "storage": "0x007BD720",
+    "thumb_entry": "0x00492FF7"
+  },
+  "stock_components": [
+    {
+      "name": "firmware/codec.bin",
+      "typeId": 4,
+      "size": 326092,
+      "crc32c": "bdcfeeac",
+      "sha256": "b06dfef7faa2f1e52d2aacd07958d4b96ffc36dca5077ac9149e48f19fc9c4d0"
+    },
+    {
+      "name": "firmware/ble_em9305.bin",
+      "typeId": 5,
+      "size": 211948,
+      "crc32c": "c074baf7",
+      "sha256": "91a38f7fc05555f86181ecb22b363e3239bfcaaa2ff6171e98524ae64821eca9"
+    },
+    {
+      "name": "firmware/touch.bin",
+      "typeId": 3,
+      "size": 34720,
+      "crc32c": "903ca49a",
+      "sha256": "c14456cd4d432815d79700b251c9a575f75c76a3710f4148c0df6ddba4cb7ba2"
+    },
+    {
+      "name": "firmware/box.bin",
+      "typeId": 6,
+      "size": 55784,
+      "crc32c": "7d443be0",
+      "sha256": "36ca0c13558f252af286ae2b36b5e576d087d21d37b15d778e7da9f502a70374"
+    },
+    {
+      "name": "ota/s200_bootloader.bin",
+      "typeId": 1,
+      "size": 149693,
+      "crc32c": "99852b7d",
+      "sha256": "423c23ce481f1690e4d0028126e495a319726efe26c36f9037105fed68791a93"
+    },
+    {
+      "name": "ota/s200_firmware_ota.bin",
+      "typeId": 0,
+      "size": 3713884,
+      "crc32c": "32576939",
+      "sha256": "6ff47ca0cf9efa222e4e96bff85a87921a0e2fff657d7b51aab7a1a8da7d847b"
+    }
+  ],
+  "anchors": [
+    {
+      "role": "chain builder",
+      "old_address": "0x00470988",
+      "new_address": "0x00470F6C",
+      "anchor_offset": 12,
+      "bytes": "80070dd5dff85009019041200090dff84c39dff87c2adff8"
+    },
+    {
+      "role": "font call 1",
+      "old_address": "0x00471318",
+      "new_address": "0x004718FC",
+      "anchor_offset": 0,
+      "bytes": "fff736fb20602068002805d02068fff76afd734908601fe0"
+    },
+    {
+      "role": "font call 2",
+      "old_address": "0x00471376",
+      "new_address": "0x0047195A",
+      "anchor_offset": 0,
+      "bytes": "fff707fb20602068002805d02068fff73bfd614908601fe0"
+    },
+    {
+      "role": "letter pair helper",
+      "old_address": "0x00491BA4",
+      "new_address": "0x00492ED4",
+      "anchor_offset": 0,
+      "bytes": "2de9f04105000e0014001f00dff8608339002800d8f80020904730603068002806d0002138682844d8f80020904700e000202060bde8f0810178090601d4012015e0017811f0e001c02901d102200ee0017811f0f001e02901d1032007e0007810f0f800f02801d1042000e00020704781b0802816d3b0f5006f15d201008909"
+    },
+    {
+      "role": "UTF-8 decoder",
+      "old_address": "0x00491CC6",
+      "new_address": "0x00492FF6",
+      "anchor_offset": 0,
+      "bytes": "81b0002200230093002900d16946002803d00b68c35c002b01d110009de00b68c35c1b0605d40a68825c0868401c086092e00b68c35c13f0e003c02b18d10a68835c13f01f039b010a68521c0a600a68825c12f0c002802a01d000207de00a68825c12f03f02d2180868401c086073e00b68c35c13f0f003e02b29d10a68835c"
+    },
+    {
+      "role": "glyph release",
+      "old_address": "0x004E64A0",
+      "new_address": "0x004E8D34",
+      "anchor_offset": 32,
+      "bytes": "00205ff0ff310860fae7e869002814d02c68002c11d0a06800280ed0724ea069"
+    },
+    {
+      "role": "glyph descriptor",
+      "old_address": "0x004E64FC",
+      "new_address": "0x004E8D90",
+      "anchor_offset": 0,
+      "bytes": "2de9fe4f070091469846002f10d1624802906248019062480090674b5a226249"
+    },
+    {
+      "role": "allocator",
+      "old_address": "0x00458382",
+      "new_address": "0x00458702",
+      "anchor_offset": 0,
+      "bytes": "70b5040000256c4e4ff47a713068eaf7"
+    }
+  ]
+}
