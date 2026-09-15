@@ -218,7 +218,7 @@ class ThaiPatchTests(unittest.TestCase):
         self.assertEqual(bytes.fromhex(hook["new"]), encode_bw(site, target))
 
     def test_relocation_sentinels_are_absent(self) -> None:
-        for sentinel in (0xA11D0001, 0xA11D0002, 0xA11D0003):
+        for sentinel in (0xA11D0001, 0xA11D0002, 0xA11D0003, 0xA11D0004):
             self.assertNotIn(sentinel.to_bytes(4, "little"), self.append)
 
     def test_callback_pins_authenticated_iar_descriptor_layout(self) -> None:

@@ -256,8 +256,13 @@ static int cache_restore(thai_runtime_font_t *runtime, const thai_glyph_t *glyph
         if(runtime->slots[slot].codepoint != codepoint) continue;
         runtime->busy = 1u;
         const uint8_t *source = cache_pixels(runtime, slot);
-        for(uint32_t y = 0; y < glyph->box_h; y++) {
-            copy_bytes(target + y * stride, source + y * cache_stride, glyph->box_w);
+        if(stride == glyph->box_w && stride == cache_stride) {
+            copy_bytes(target, source, (uint32_t)stride * glyph->box_h);
+        }
+        else {
+            for(uint32_t y = 0; y < glyph->box_h; y++) {
+                copy_bytes(target + y * stride, source + y * cache_stride, glyph->box_w);
+            }
         }
         runtime->slots[slot].stamp = cache_tick(runtime);
         runtime->busy = 0u;
@@ -281,10 +286,15 @@ static void cache_store(thai_runtime_font_t *runtime, const thai_glyph_t *glyph,
     }
     runtime->busy = 1u;
     uint8_t *destination = cache_pixels(runtime, selected);
-    for(uint32_t y = 0; y < glyph->box_h; y++) {
-        copy_bytes(destination + y * cache_stride, source + y * stride, glyph->box_w);
-        for(uint32_t x = glyph->box_w; x < cache_stride; x++) {
-            destination[y * cache_stride + x] = 0;
+    if(stride == glyph->box_w && stride == cache_stride) {
+        copy_bytes(destination, source, (uint32_t)stride * glyph->box_h);
+    }
+    else {
+        for(uint32_t y = 0; y < glyph->box_h; y++) {
+            copy_bytes(destination + y * cache_stride, source + y * stride, glyph->box_w);
+            for(uint32_t x = glyph->box_w; x < cache_stride; x++) {
+                destination[y * cache_stride + x] = 0;
+            }
         }
     }
     runtime->slots[selected].codepoint = codepoint;
@@ -300,6 +310,21 @@ bool thai_get_glyph_dsc(const uint32_t *font, void *glyph_dsc,
     if(!glyph || !glyph->present) return false;
 
     uint8_t *out = (uint8_t *)glyph_dsc;
+    /* Stock descriptors are word-aligned. Preserve the byte-safe path for
+       unusual callers, but avoid 32 byte stores on every normal lookup. */
+    if(((uintptr_t)out & 3u) == 0u) {
+        alias_u32_t *words = (alias_u32_t *)(uintptr_t)out;
+        words[0] = (uint32_t)(uintptr_t)font;
+        words[1] = glyph->advance | ((uint32_t)glyph->box_w << 16);
+        words[2] = glyph->box_h | ((uint32_t)(uint16_t)(int16_t)glyph->ofs_x << 16);
+        words[3] = (uint16_t)(int16_t)glyph->ofs_y |
+                   (LV_FONT_GLYPH_FORMAT_A8 << 16);
+        words[4] = 0;
+        words[5] = 0;
+        words[6] = codepoint;
+        words[7] = 0;
+        return true;
+    }
     for(uint32_t i = 0; i < GLYPH_DSC_SIZE; i++) out[i] = 0;
     write_u32(out + 0, (uint32_t)(uintptr_t)font);
     write_u16(out + 4, glyph->advance);
@@ -418,6 +443,8 @@ static int is_thai_font(const uint32_t *font) {
            font == thai_font_40 || font == thai_font_48) return 1;
     return runtime_font_from(font) != 0;
 }
+
+#include "thai_lookup.h"
 
 static int writable_ram_node(const uint32_t *node) {
     return writable_ram_range(node, 32u);

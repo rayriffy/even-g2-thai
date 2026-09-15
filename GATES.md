@@ -1,44 +1,25 @@
-# Gates: G2 firmware 2.2.10.10 rebase
+# Gates: Thai rendering performance on 2.2.10.10
 
-Scope: authenticate firmware 2.2.10.10, relocate every Thai patch dependency, rebuild the OTA, and verify its Case-USB writer integration.
+OWNS: patches/thai*, tools/*, tests/*, docs/*, README.md, GATES.md, patches/webflasher_case_usb_thai.patch, third_party/evenRealities-webflasher/src/lib/localTempleFlashTargets.js
 
-Execution note: checks below were run directly and their results recorded here.
-The companion's npm uses the installed npm CLI through a temporary launcher
-with the bundled Node runtime; no project dependency versions were changed.
+Scope: decompile authenticated stock font paths, reduce Thai rendering CPU work, preserve shaping and buffer ownership, rebuild and validate a local candidate.
 
-- [x] G0: this ledger states executable outcomes that can fail
-  CHECK: /Users/rayriffy/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/rayriffy/.agents/skills/unlazy/scripts/gate-lint.mjs GATES.md
-  EXPECT: LINT OK
-  EVIDENCE: gate-lint exited 0 with LINT OK; two expected warnings identify the manual review and browser/reproduction gates.
-
-- [x] G1: the rebased firmware builds and all firmware tests pass
+- [x] G1: Stock disassembly and reconstructed control flow explain the optimization and its limits
+  EVIDENCE: SHA-pinned Thumb listing plus reconstructed descriptor/bitmap/release control flow in docs/thai-performance.md; XIP font-bank and hardware boundaries explicit.
+- [x] G2: Rebuilt firmware passes all regression and emulation checks
   CHECK: rtk proxy env PATH=/Users/rayriffy/Git/g2-thai/.venv/bin:/usr/bin:/bin:/usr/sbin:/sbin make check
-  EXPECT: Ran 48 tests
-  EVIDENCE: /bin/sh; cwd=/Users/rayriffy/Git/g2-thai; exit=0; 48 tests passed, zero skips; built SHA-256 cad29efb784121ece18207989bb7f9d57e2ba4a1349883dd3689f89de5654308.
-
-- [x] G2: the rebuilt OTA has a valid six-component container
-  CHECK: PATH="/Users/rayriffy/Git/g2-thai/.venv/bin:$PATH" python3 tools/verify_firmware.py build/g2_2.2.10.10_thai.bin
-  EXPECT: verified 6 EVENOTA components
-  EVIDENCE: exit=0; project verifier and independent pinned g2flash.validate_firmware both validated stock and patched six-component bundles; all five non-main components preserved.
-
-- [x] G3: WebFlasher accepts exactly the rebased local artifact
-  CHECK: PATH="/Users/rayriffy/Git/g2-thai/.venv/bin:$PATH" make webflasher
-  EXPECT: webflasher pin matches artifact
-  EVIDENCE: exit=0; bundle pin cad29efb784121ece18207989bb7f9d57e2ba4a1349883dd3689f89de5654308; main pin 050863006aef8c0d47a730c51410c192155b39c04bbb106c05d1c7a424e9711b; 3851366 bytes.
-
-- [x] G4: the vendored WebFlasher tests and production build pass
-  CHECK: rtk proxy env PATH=/tmp/g2-tool-bin:/Users/rayriffy/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/usr/bin:/bin npm run check
-  EXPECT: built in
-  CWD: third_party/evenRealities-webflasher
-  EVIDENCE: exit=0; 345 Node tests, zero skips; Vite production build passed; /tmp/g2-webflasher-check.log. Separately, 25 Python companion tests passed with pyserial 3.5; /tmp/g2-webflasher-python.log.
-
-- [x] G5: official provenance and every version-specific relocation are independently reviewed
-  EVIDENCE: autoreview --mode local using /Applications/ChatGPT.app/Contents/Resources/codex exited 0; no accepted/actionable findings, correctness confidence 0.94. Reviewer independently matched binaries, component hashes, anchors, hook destinations, decoder pointers, patch regions, font identity and both writer pins. Result: /tmp/g2-rebase-review.json.
-
-- [x] G6: real Thai and stock rollback files pass the parser and final writer gate while tampered files fail
+  EXPECT: OK
+  EVIDENCE: automatic-evidence=v1; definition-sha256=4af54b6b8371bfcd8db0b2e6e4c6e4449585f7ba221e5807d3354c97926bab20; exit=0; EXPECT=matched; output-sha256=497ffd48860aaa3559c7f119fe212a7e7ae04fb0b8a10df87f17cd37707a9780; output-bytes=8260; shell=/bin/sh; cwd=/Users/rayriffy/Git/g2-thai; path=8bc73469e98a/21 entries
+- [x] G3: Deterministic artifact benchmark demonstrates reduced lookup and bitmap instruction counts
+  CHECK: rtk proxy .venv/bin/python tools/benchmark_thai.py --baseline build/perf-baseline --output build/thai-performance.json
+  EXPECT: PERFORMANCE_OK
+  EVIDENCE: automatic-evidence=v1; definition-sha256=d2a54af17112ecff2a8200c51ee02cd5cb61479103c34790680a39e1cf29c354; exit=0; EXPECT=matched; output-sha256=fe3e83686d341792283e1f954ee2cae5af54a3799b39d86397f7929ae7dc5ec2; output-bytes=171; shell=/bin/sh; cwd=/Users/rayriffy/Git/g2-thai; path=8bc73469e98a/21 entries
+- [x] G4: WebFlasher exact pins accept the candidate and rollback and reject mutations
   CHECK: rtk proxy /Users/rayriffy/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node tools/check_webflasher_artifacts.mjs
   EXPECT: WEBFLASHER_ARTIFACTS_OK
-  EVIDENCE: exit=0; both positive controls accepted; payload mutations and unknown whole-bundle pins rejected.
+  EVIDENCE: automatic-evidence=v1; definition-sha256=23c940328866e8961b6beb911d5d025f956204c95828660b43dba90ed0a060c3; exit=0; EXPECT=matched; output-sha256=de63f7b8fd20d1fe45f27de917ff2ee4849c38239bfbadb67a3aa3cd7d5a6d17; output-bytes=182; shell=/bin/sh; cwd=/Users/rayriffy/Git/g2-thai; path=8bc73469e98a/21 entries
+- [x] G5: Final diff, generated artifact reproducibility, and documentation agree
+  EVIDENCE: Fresh compile byte-matches patch spec; candidate SHA-256 92ba54d4203e97e426425385eec98af8aeb801d0faacb95c2e54ab9b3308452f; pinned G2Flash validates both six-component bundles; portable companion patch reproduces all 12 files; 158 relevant companion tests and Vite build pass; git diff --check clean. Semantic scan reviewed with no actionable findings; assembly-only call edge verified by artifact emulation. Docs state hardware and native-bank limits.
 
-- [x] G7: the portable companion patch reproduces the working companion and both files load in the browser
-  EVIDENCE: git apply succeeded on a fresh c437fdf checkout at /tmp/g2-webflasher-rebase-proof; all 12 changed files matched byte-for-byte. Browser http://127.0.0.1:3000/#firmware accepted Thai and stock 2.2.10.10 with correct hashes and Validated locally; no console errors; no device connected.
+Hardware boundary: no flashing requested. Actual frame rate, GPU timing, boot and rollback require physical validation; offline instruction counts do not establish FPS parity.
+Discovery: indexed symbol search `thai` located patches/thai_font.c callbacks and emulator tests; affected-test graph found test_patch.py and test_rebase.py. Binary-dispatched emulation coverage is checked explicitly too.

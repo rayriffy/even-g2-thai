@@ -28,6 +28,10 @@ HOOK_SITES = {
     0x0047195A: bytes.fromhex("ff f7 07 fb"),
 }
 TEXT_HELPER_SITE = (0x00492ED4, bytes.fromhex("2d e9 f0 41"))
+GLYPH_LOOKUP_SITE = (
+    0x004E8D90,
+    bytes.fromhex("2d e9 fe 4f 07 00 91 46 98 46 00 2f 10 d1 62 48"),
+)
 LV_MALLOC_SITE = (
     0x00458702,
     bytes.fromhex("70 b5 04 00 00 25 6c 4e 4f f4 7a 71 30 68 ea f7"),
@@ -163,8 +167,10 @@ def build_spec(stock: bytes, font_blob: bytes, build: dict[str, object]) -> dict
     font_base = mram_addr(font_offset)
 
     dsc_address = code_base + function_offset(build, "thai_get_glyph_dsc") | 1
+    replace_words(code, 0xA11D0004, dsc_address, expected=1)
     bitmap_address = code_base + function_offset(build, "thai_get_glyph_bitmap") | 1
     chain_address = code_base + function_offset(build, "thai_chain_build")
+    lookup_address = code_base + function_offset(build, "thai_font_get_glyph_dsc")
     text_helper_address = code_base + function_offset(
         build, "thai_text_encoded_letter_next_2"
     )
@@ -217,6 +223,13 @@ def build_spec(stock: bytes, font_blob: bytes, build: dict[str, object]) -> dict
         "LVGL letter-pair decode -> Thai contextual mark wrapper",
     )
 
+    lookup_site, lookup_expected = GLYPH_LOOKUP_SITE
+    lookup_offset = lookup_site - G2_FILE_DELTA
+    if stock[lookup_offset:lookup_offset + len(lookup_expected)] != lookup_expected:
+        raise ValueError("glyph lookup entry anchor mismatch")
+    record(lookup_offset, encode_bw(lookup_site, lookup_address),
+           "LVGL glyph lookup -> covered Thai shortcut")
+
     payload_end = component_offset + 128 + old_size
     operations.append(
         {
@@ -251,6 +264,8 @@ def build_spec(stock: bytes, font_blob: bytes, build: dict[str, object]) -> dict
         "output_sha256": hashlib.sha256(data).hexdigest(),
         "metadata": {
             "target": "Even Realities G2 2.2.10.10",
+            "glyph_lookup_hook_site": f"0x{lookup_site:08X}",
+            "glyph_lookup_wrapper_address": f"0x{lookup_address:08X}",
             "component_count": struct.unpack_from("<I", stock, 8)[0],
             "lvgl": "9.3.0-dev",
             "lv_malloc_address": f"0x{malloc_address:08X}",

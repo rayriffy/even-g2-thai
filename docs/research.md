@@ -67,6 +67,11 @@ LVGL's built-in bitmap-font path.
 
 ## Rendering cost
 
+The current lookup shortcut, descriptor stores and contiguous cache copies
+are documented in [Thai performance](thai-performance.md), with stock
+disassembly and reproducible instruction-count evidence.
+
+
 The firmware converts each embedded glyph from packed A4 to LVGL A8 in the
 draw buffer. Aligned rows expand two output pixels per packed byte with a
 single 16-bit store from a 256-entry pair lookup; unusual unaligned rows retain

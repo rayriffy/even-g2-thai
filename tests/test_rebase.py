@@ -63,3 +63,13 @@ class RebaseTests(unittest.TestCase):
         altered[-1] ^= 1
         with self.assertRaises(ValueError):
             apply_spec(bytes(altered), self.spec)
+
+    def test_stock_main_changes_only_at_four_hooks_and_preamble(self):
+        patched = apply_spec(self.stock, self.spec)
+        _, offset, size = mainapp(self.stock)
+        allowed = set(range(offset + 128, offset + 136))
+        for address in (0x4718FC, 0x47195A, 0x492ED4, 0x4E8D90):
+            allowed.update(range(address - G2_FILE_DELTA, address - G2_FILE_DELTA + 4))
+        changed = {i for i in range(offset + 128, offset + 128 + size)
+                   if self.stock[i] != patched[i]}
+        self.assertTrue(changed <= allowed, changed - allowed)
