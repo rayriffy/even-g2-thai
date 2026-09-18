@@ -8,12 +8,12 @@ import {
 } from "../third_party/evenRealities-webflasher/src/lib/pogoFlashBridge.js";
 
 for (const [path, channel] of [
-  ["../build/g2_2.2.10.10_thai.bin", "custom"],
-  ["../.cache/g2_2.2.10.10.bin", "official"],
+  ["../build/g2_2.3.0.24_thai.bin", "custom"],
+  ["../.cache/g2_2.3.0.24.bin", "official"],
 ]) {
   const bytes = new Uint8Array(await readFile(new URL(path, import.meta.url)));
   const firmware = await parseFirmwareInput(bytes, path.split("/").pop());
-  assert.equal(firmware.g2Version, "2.2.10.10");
+  assert.equal(firmware.g2Version, "2.3.0.24");
   assert.equal(firmware.provenance.channel, channel);
   assert.equal(firmware.templeFlashEligible, true);
   assert.equal(firmware.templeFlashTarget.localOnly, true);

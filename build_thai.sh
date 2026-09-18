@@ -6,15 +6,15 @@ G2FLASH_ROOT="${G2FLASH_ROOT:-$ROOT/../g2flash}"
 G2FLASH_COMMIT="877c8d9490db0d3717ca012dd0f54556af3701bd"
 CACHE="$ROOT/.cache"
 BUILD="$ROOT/build"
-STOCK="$CACHE/g2_2.2.10.10.bin"
+STOCK="$CACHE/g2_2.3.0.24.bin"
 FONT="$ROOT/third_party/2005_iannnnnAMD.ttf"
 FONT_THIN_EDGES=1
 FONT_BLOB="$BUILD/thai_font.bin"
 PATCH_SPEC="$ROOT/patches/thai_patches.json"
-OUTPUT="$BUILD/g2_2.2.10.10_thai.bin"
+OUTPUT="$BUILD/g2_2.3.0.24_thai.bin"
 
-FW_URL="https://cdn.evenreal.co/firmware/5d2abaf086ad7cc4709cad679b7b24d1.bin"
-FW_SHA256="927879057685a4147c6ba1fe33e5f3740d3cc48f87141a9039204d94516e65b8"
+FW_URL="https://cdn.evenreal.co/firmware/1dbdf37b03a1169c384945e94d671371.bin"
+FW_SHA256="187ccf2bcc5c17a212106e8a376745511e8289c4232b634a7ea94b9bf25a0979"
 FONT_SHA256="688f2ef20776a1f0286bd73bef4dd5d5c76640f4a7c4f0ea5f7c1b8d87a969b7"
 
 UPDATE_PATCHES=0
@@ -81,7 +81,7 @@ g2flash_dirty="$(git -C "$G2FLASH_ROOT" status --porcelain --untracked-files=all
   exit 1
 }
 
-fetch_verified "$FW_URL" "$STOCK" "$FW_SHA256" "stock G2 2.2.10.10 firmware"
+fetch_verified "$FW_URL" "$STOCK" "$FW_SHA256" "stock G2 2.3.0.24 firmware"
 
 if [[ "$UPDATE_PATCHES" -eq 1 ]]; then
   [[ -f "$FONT" ]] || {

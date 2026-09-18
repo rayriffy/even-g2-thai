@@ -1,7 +1,7 @@
 # Thai rendering patch research
 
-Current target: **2.2.10.10**. Its complete address map, provenance, decoder
-dispatch and validation record are in [the current rebase evidence](rebases/2.2.10.10.md).
+Current target: **2.3.0.24**. Its complete address map, provenance, decoder
+dispatch and validation record are in [the current rebase evidence](rebases/2.3.0.24.md).
 The sections below retain the 2.2.9.22 research and crash history; their numeric
 addresses describe that historical image, not the current patch.
 

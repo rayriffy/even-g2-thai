@@ -15,8 +15,8 @@ make webflasher
 Keep both images:
 
 ```text
-.cache/g2_2.2.10.10.bin
-build/g2_2.2.10.10_thai.bin
+.cache/g2_2.3.0.24.bin
+build/g2_2.3.0.24_thai.bin
 ```
 
 `make webflasher` verifies that the exact whole-bundle and Apollo-main hashes
@@ -39,8 +39,8 @@ the operation. Do not factory-reset or unpair the glasses or R1 ring.
 
 ## 3. Flash one lens first
 
-Confirm both temples report `2.2.10.10` before selecting this build.
-In WebFlasher, choose the local `build/g2_2.2.10.10_thai.bin` file. It must
+Confirm both temples report `2.3.0.24` before selecting this build.
+In WebFlasher, choose the local `build/g2_2.3.0.24_thai.bin` file. It must
 show **Validated locally** and the exact Thai Case-USB-only pin.
 
 Open **Advanced Mode → Recovery Console → Running-temple recovery through the
@@ -62,17 +62,17 @@ dimple repeatedly to prove the dashboard does not reboot, then test:
 ```
 
 Only after these checks pass should the other temple be flashed. The patched
-firmware intentionally reports stock version `2.2.10.10`, so version liveness
+firmware intentionally reports stock version `2.3.0.24`, so version liveness
 does not distinguish the Thai build; dashboard and rendering checks do.
 
 ## Rollback
 
-Use the same manual Case recovery panel with `.cache/g2_2.2.10.10.bin`, one
+Use the same manual Case recovery panel with `.cache/g2_2.3.0.24.bin`, one
 temple at a time. The retained stock bundle is the deterministic rollback
 artifact.
 
-Both 2.2.10.10 images are accepted by exact local pins even though the hosted
-catalog ends at 2.2.9.22. Keep using the local-file selector for rollback.
+Both 2.3.0.24 images are accepted by exact local pins even though the vendored
+companion's catalog is older. Keep using the local-file selector for rollback.
 
 Offline checks prove container integrity and writer pins only. They cannot
 prove boot, display quality, thermal behavior, or recovery on physical glasses.

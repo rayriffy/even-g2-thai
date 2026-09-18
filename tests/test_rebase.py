@@ -1,4 +1,4 @@
-"""Authenticate the 2.2.10.10 mapping and preserve all stock components."""
+"""Authenticate the 2.3.0.24 mapping and preserve all stock components."""
 from __future__ import annotations
 
 import hashlib
@@ -17,18 +17,18 @@ from generate_patch import APP_LOAD_ADDR, APP_PREAMBLE, G2_FILE_DELTA, mainapp
 class RebaseTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        stock = ROOT / ".cache/g2_2.2.10.10.bin"
+        stock = ROOT / ".cache/g2_2.3.0.24.bin"
         if not stock.exists():
             raise unittest.SkipTest("stock firmware cache absent")
         cls.stock = stock.read_bytes()
         cls.spec = json.loads((ROOT / "patches/thai_patches.json").read_text())
-        cls.record = json.loads((ROOT / "docs/rebases/2.2.10.10.json").read_text())
+        cls.record = json.loads((ROOT / "docs/rebases/2.3.0.24.json").read_text())
 
     def test_component_mapping_is_derived_from_new_container(self):
         index, offset, size = mainapp(self.stock)
-        self.assertEqual((index, offset, size), (5, 0xBE32D, 3713884))
+        self.assertEqual((index, offset, size), (5, 0xBE36B, 3758720))
         self.assertEqual(APP_LOAD_ADDR - offset - 128 - APP_PREAMBLE, G2_FILE_DELTA)
-        self.assertIn(b"s200_v2.2.10.10", self.stock)
+        self.assertIn(b"s200_v2.3.0.24", self.stock)
         self.assertEqual(hashlib.sha256(self.stock).hexdigest(), self.record["stock_sha256"])
         self.assertEqual(len(self.stock), self.record["stock_size"])
 
@@ -68,7 +68,7 @@ class RebaseTests(unittest.TestCase):
         patched = apply_spec(self.stock, self.spec)
         _, offset, size = mainapp(self.stock)
         allowed = set(range(offset + 128, offset + 136))
-        for address in (0x4718FC, 0x47195A, 0x492ED4, 0x4E8D90):
+        for address in (0x4714E8, 0x471546, 0x49333C, 0x4EA368):
             allowed.update(range(address - G2_FILE_DELTA, address - G2_FILE_DELTA + 4))
         changed = {i for i in range(offset + 128, offset + 128 + size)
                    if self.stock[i] != patched[i]}

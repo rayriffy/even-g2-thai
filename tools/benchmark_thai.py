@@ -78,7 +78,7 @@ def main():
         for name, text in SAMPLES.items():
             before = measure(baseline / 'g2_2.2.10.10_thai.bin',
                              baseline / 'thai_patches.json', size, text)
-            after = measure(ROOT / 'build/g2_2.2.10.10_thai.bin',
+            after = measure(ROOT / 'build/g2_2.3.0.24_thai.bin',
                             ROOT / 'patches/thai_patches.json', size, text)
             assert before['pixels_and_metrics_sha256'] == after['pixels_and_metrics_sha256']
             for old, new in zip(before['frames'], after['frames']):
@@ -97,7 +97,7 @@ def main():
         controls = []
         for artifact, spec in (
             (baseline / 'g2_2.2.10.10_thai.bin', baseline / 'thai_patches.json'),
-            (ROOT / 'build/g2_2.2.10.10_thai.bin', ROOT / 'patches/thai_patches.json')):
+            (ROOT / 'build/g2_2.3.0.24_thai.bin', ROOT / 'patches/thai_patches.json')):
             f = FontFixture(artifact, spec)
             root, _ = f.chain()
             f.native_result = True

@@ -12,9 +12,9 @@ from pathlib import Path
 import test_thai_device_path as device
 from unicorn import UC_HOOK_CODE
 
-LOOKUP = 0x004E8D90
-XIP_ENTER = 0x004760EA
-XIP_EXIT = 0x00476100
+LOOKUP = 0x004EA368
+XIP_ENTER = 0x00475CD6
+XIP_EXIT = 0x00475CEC
 
 
 class FontFixture:

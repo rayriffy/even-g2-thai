@@ -8,18 +8,18 @@ from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB
 from generate_patch import G2_FILE_DELTA, STOCK_SHA256
 
 RANGES = (
-    ('font-manager background chain call', 0x4718F8, 0x471914),
-    ('font-manager foreground chain call', 0x471956, 0x471972),
-    ('XIP acquire and release guards', 0x4760EA, 0x476116),
-    ('bitmap dispatch', 0x4E8CE2, 0x4E8D34),
-    ('glyph release', 0x4E8D34, 0x4E8D90),
-    ('glyph descriptor fallback dispatch', 0x4E8D90, 0x4E8EC4),
+    ('font-manager background chain call', 0x4714E4, 0x471500),
+    ('font-manager foreground chain call', 0x471542, 0x47155E),
+    ('XIP acquire and release guards', 0x475CD6, 0x475D02),
+    ('bitmap dispatch', 0x4EA2BA, 0x4EA30C),
+    ('glyph release', 0x4EA30C, 0x4EA368),
+    ('glyph descriptor fallback dispatch', 0x4EA368, 0x4EA49C),
 )
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--stock', type=Path, default=Path('.cache/g2_2.2.10.10.bin'))
+    parser.add_argument('--stock', type=Path, default=Path('.cache/g2_2.3.0.24.bin'))
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     data = args.stock.read_bytes()

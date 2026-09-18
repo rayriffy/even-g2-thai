@@ -25,8 +25,8 @@ PATCH_SPEC = ROOT / "patches" / "thai_patches.json"
 CODE_BASE = 0x007D0000
 FLASH_BASE = 0x00400000
 FLASH_SIZE = 0x00400000
-STOCK_CHAIN_BUILD_THUMB = 0x00470F6D
-LV_MALLOC_THUMB = 0x00458703
+STOCK_CHAIN_BUILD_THUMB = 0x00470B59
+LV_MALLOC_THUMB = 0x0045855F
 RAM_BASE = 0x20000000
 RAM_SIZE = 0x00100000
 WRITABLE_RAM_BASE = 0x20000000
@@ -137,7 +137,7 @@ class ThaiChainEmulationTests(unittest.TestCase):
         return CODE_BASE + self.fonts[name]
 
     def set_stock_return(self, value: int) -> None:
-        # The stock call site targets 0x00470989 with the Thumb bit set, so the
+        # The stock call site targets 0x00470B59 with the Thumb bit set, so the
         # CPU fetches from the even address; the stub must live there.
         stub = bytes.fromhex("00487047") + struct.pack("<I", value)
         self.uc.mem_write(STOCK_CHAIN_BUILD_THUMB & ~1, stub)

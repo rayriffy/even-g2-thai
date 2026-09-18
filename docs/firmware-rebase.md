@@ -478,7 +478,8 @@ retired from this project.
 
 ## Worked examples
 
-- [G2 2.2.10.10 rebase evidence](rebases/2.2.10.10.md) (current target)
+- [G2 2.3.0.24 rebase evidence](rebases/2.3.0.24.md) (current target)
+- [G2 2.2.10.10 rebase evidence](rebases/2.2.10.10.md)
 - [G2 2.2.8.4 rebase evidence](rebases/2.2.8.4.md)
 - [G2 2.2.9.22 rebase evidence](rebases/2.2.9.22.md)
 
