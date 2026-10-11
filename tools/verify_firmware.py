@@ -32,6 +32,8 @@ def verify(image: bytes) -> list[str]:
         names.append(name)
         if name.endswith("s200_firmware_ota.bin"):
             preamble_size, stored_crc = struct.unpack_from("<II", payload)
+            if struct.unpack_from("<I", payload, 0x14)[0] != APP_LOAD_ADDR:
+                raise ValueError("main-app preamble load address mismatch")
             if preamble_size & 0xFFFFFF != payload_size & 0xFFFFFF:
                 raise ValueError("main-app preamble size mismatch")
             actual_preamble = zlib.crc32(payload[8:]) & 0xFFFFFFFF
@@ -39,7 +41,7 @@ def verify(image: bytes) -> list[str]:
                 raise ValueError("main-app preamble CRC-32 mismatch")
             programmed_end = APP_LOAD_ADDR + payload_size - APP_PREAMBLE
             if programmed_end > APP_MAX_END:
-                raise ValueError("main app exceeds conservative MRAM ceiling")
+                raise ValueError("main app exceeds authenticated MRAM install boundary")
     return names
 
 

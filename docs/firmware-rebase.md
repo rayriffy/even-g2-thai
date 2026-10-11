@@ -328,7 +328,7 @@ Current constants are:
 ```text
 APP_LOAD_ADDR = 0x00438000
 APP_PREAMBLE  = 0x20
-APP_MAX_END   = 0x007F0000
+APP_MAX_END   = 0x007FE000  # authenticated for 2.3.2.14 only
 ```
 
 Do not assume these survive a future architecture or bootloader change. Verify
@@ -416,7 +416,8 @@ Run `g2flash.validate_firmware` on the final image. Confirm:
 - main preamble load address remains `0x00438000`;
 - preamble low-24 length equals the staged main payload size;
 - internal zlib CRC-32 is current;
-- programmed end remains at or below `0x007F0000`.
+- programmed end remains at or below the target's authenticated install boundary
+  (`0x007FE000` for 2.3.2.14; the older conservative estimate was `0x007F0000`).
 
 ### Component identity gate
 
@@ -478,7 +479,8 @@ retired from this project.
 
 ## Worked examples
 
-- [G2 2.3.0.24 rebase evidence](rebases/2.3.0.24.md) (current target)
+- [G2 2.3.2.14 rebase evidence](rebases/2.3.2.14.md) (current target)
+- [G2 2.3.0.24 rebase evidence](rebases/2.3.0.24.md)
 - [G2 2.2.10.10 rebase evidence](rebases/2.2.10.10.md)
 - [G2 2.2.8.4 rebase evidence](rebases/2.2.8.4.md)
 - [G2 2.2.9.22 rebase evidence](rebases/2.2.9.22.md)

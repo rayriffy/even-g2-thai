@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare real Thumb instructions in two firmware artifacts; never estimate FPS."""
+"""Historical A4 output-parity benchmark; requires the 2.2.10.10 checkout."""
 import argparse
 import hashlib
 import json
@@ -72,6 +72,10 @@ def main():
     parser.add_argument('--baseline', required=True, type=Path)
     parser.add_argument('--output', required=True, type=Path)
     args = parser.parse_args()
+    target = json.loads((ROOT / 'patches/thai_patches.json').read_text())['metadata']['target']
+    if target != 'Even Realities G2 2.2.10.10':
+        parser.error('This historical A4 parity benchmark requires a 2.2.10.10 checkout; '
+                     'compact A2 pixels differ, so its performance assertions do not apply.')
     baseline = args.baseline
     rows = []
     for size in (16, 20, 24, 28, 32, 36, 40, 48):

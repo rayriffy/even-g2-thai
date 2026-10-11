@@ -1,4 +1,4 @@
-/* LVGL 9.3 Thai fallback for Even Realities G2 firmware 2.3.0.24. */
+/* LVGL 9.3 Thai fallback for Even Realities G2 firmware 2.3.2.14. */
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -14,15 +14,15 @@
 #define FONT_BITMAP_MAGIC 0xA11D0002u
 #define FONT_DATA_MAGIC 0xA11D0003u
 #define LV_FONT_GLYPH_FORMAT_A8 0x08u
-#define STOCK_CHAIN_BUILD_THUMB 0x00470B59u
-#define LV_MALLOC_THUMB 0x0045855Fu
+#define STOCK_CHAIN_BUILD_THUMB 0x00471239u
+#define LV_MALLOC_THUMB 0x0047EC6Bu
 /* The stock letter helper loads its UTF-8 decoder through the double pointer
-   at 0x004936AC (slot address, then function pointer) so it always matches
+   at 0x00494330 (slot address, then function pointer) so it always matches
    the firmware's active text encoder. Calling any hardcoded entry instead
    breaks that contract: the old 2.2.9.22 helper at 0x00491E24 dereferences its offset
    argument unconditionally and faults when the lookahead pass passes NULL,
    which is exactly how the stock helper invokes its decoder. */
-#define STOCK_DECODE_SLOT_INDIRECT 0x004936ACu
+#define STOCK_DECODE_SLOT_INDIRECT 0x00494330u
 #define WRITABLE_RAM_BASE 0x20000000u
 #define WRITABLE_RAM_END 0x20080000u
 #define GLYPH_DSC_SIZE 32u
@@ -34,15 +34,14 @@
 #define FONT_WORD_COUNT 9u
 
 typedef struct {
-    uint32_t bitmap_offset;
+    uint16_t bitmap_offset;
     uint16_t advance;
     uint8_t box_w;
     uint8_t box_h;
     int8_t ofs_x;
     int8_t ofs_y;
-    uint8_t row_bytes;
-    uint8_t present;
 } thai_glyph_t;
+_Static_assert(sizeof(thai_glyph_t) == 8, "compact font record ABI");
 
 typedef void *(*stock_chain_build_fn)(void *configs, uint32_t count);
 typedef uint32_t (*stock_decode_fn)(const char *text, uint32_t *offset);
@@ -65,35 +64,6 @@ typedef struct {
     thai_cache_slot_t slots[THAI_CACHE_SLOTS];
     uint8_t pixels[];
 } thai_runtime_font_t;
-
-static const uint8_t a4_to_a8[16] = {
-    0u, 17u, 34u, 51u, 68u, 85u, 102u, 119u,
-    136u, 153u, 170u, 187u, 204u, 221u, 238u, 255u,
-};
-
-#define A4_TO_A8_PAIR(first, second) \
-    ((uint16_t)((uint16_t)(first) * 17u | ((uint16_t)(second) * 17u << 8)))
-#define A4_TO_A8_PAIR_ROW(first) \
-    A4_TO_A8_PAIR(first, 0u), A4_TO_A8_PAIR(first, 1u), \
-    A4_TO_A8_PAIR(first, 2u), A4_TO_A8_PAIR(first, 3u), \
-    A4_TO_A8_PAIR(first, 4u), A4_TO_A8_PAIR(first, 5u), \
-    A4_TO_A8_PAIR(first, 6u), A4_TO_A8_PAIR(first, 7u), \
-    A4_TO_A8_PAIR(first, 8u), A4_TO_A8_PAIR(first, 9u), \
-    A4_TO_A8_PAIR(first, 10u), A4_TO_A8_PAIR(first, 11u), \
-    A4_TO_A8_PAIR(first, 12u), A4_TO_A8_PAIR(first, 13u), \
-    A4_TO_A8_PAIR(first, 14u), A4_TO_A8_PAIR(first, 15u)
-static const uint16_t a4_to_a8_pair[256] = {
-    A4_TO_A8_PAIR_ROW(0u), A4_TO_A8_PAIR_ROW(1u),
-    A4_TO_A8_PAIR_ROW(2u), A4_TO_A8_PAIR_ROW(3u),
-    A4_TO_A8_PAIR_ROW(4u), A4_TO_A8_PAIR_ROW(5u),
-    A4_TO_A8_PAIR_ROW(6u), A4_TO_A8_PAIR_ROW(7u),
-    A4_TO_A8_PAIR_ROW(8u), A4_TO_A8_PAIR_ROW(9u),
-    A4_TO_A8_PAIR_ROW(10u), A4_TO_A8_PAIR_ROW(11u),
-    A4_TO_A8_PAIR_ROW(12u), A4_TO_A8_PAIR_ROW(13u),
-    A4_TO_A8_PAIR_ROW(14u), A4_TO_A8_PAIR_ROW(15u),
-};
-#undef A4_TO_A8_PAIR_ROW
-#undef A4_TO_A8_PAIR
 
 /* Exact 32-bit lv_font_t word layout for the authenticated LVGL 9.3 build. */
 #define FONT_WORDS(line_height, base_line, index) \
@@ -179,7 +149,7 @@ static const thai_glyph_t *glyph_record(const uint32_t *font, uint32_t codepoint
     if(size_index >= SIZE_COUNT) return 0;
     uint32_t records_offset = read_u32(data + 12);
     uint32_t record_index = size_index * GLYPH_COUNT + glyph_index;
-    return (const thai_glyph_t *)(data + records_offset + record_index * 12u);
+    return (const thai_glyph_t *)(data + records_offset + record_index * 8u);
 }
 
 static uint16_t cache_slot_bytes_for_font(const uint32_t *font) {
@@ -190,8 +160,8 @@ static uint16_t cache_slot_bytes_for_font(const uint32_t *font) {
     uint32_t largest = 0;
     for(uint32_t index = 0; index < GLYPH_COUNT; index++) {
         const thai_glyph_t *glyph = (const thai_glyph_t *)(
-            data + records_offset + (size_index * GLYPH_COUNT + index) * 12u);
-        if(!glyph->present) continue;
+            data + records_offset + (size_index * GLYPH_COUNT + index) * 8u);
+        if(!glyph->box_w) continue;
         uint32_t cache_stride = ((uint32_t)glyph->box_w + 3u) & ~3u;
         uint32_t bytes = cache_stride * glyph->box_h;
         if(bytes > largest) largest = bytes;
@@ -307,7 +277,7 @@ bool thai_get_glyph_dsc(const uint32_t *font, void *glyph_dsc,
                         uint32_t codepoint, uint32_t next_codepoint) {
     (void)next_codepoint;
     const thai_glyph_t *glyph = glyph_record(font, codepoint);
-    if(!glyph || !glyph->present) return false;
+    if(!glyph || !glyph->box_w) return false;
 
     uint8_t *out = (uint8_t *)glyph_dsc;
     /* Stock descriptors are word-aligned. Preserve the byte-safe path for
@@ -344,7 +314,7 @@ const void *thai_get_glyph_bitmap(void *glyph_dsc, void *draw_buf) {
     const uint32_t *font = (const uint32_t *)(uintptr_t)read_u32(dsc);
     uint32_t codepoint = read_u32(dsc + GLYPH_DSC_GID_OFFSET);
     const thai_glyph_t *glyph = glyph_record(font, codepoint);
-    if(!glyph || !glyph->present) return 0;
+    if(!glyph || !glyph->box_w) return 0;
 
     const uint8_t *font_data = (const uint8_t *)(uintptr_t)thai_font_data_address;
     const uint8_t *source = font_data + glyph->bitmap_offset;
@@ -362,27 +332,19 @@ const void *thai_get_glyph_bitmap(void *glyph_dsc, void *draw_buf) {
         return draw_buf;
     }
 
-    for(uint32_t y = 0; y < glyph->box_h; y++) {
-        const uint8_t *row = source + y * glyph->row_bytes;
+    /* Half-resolution A2, expanded directly into the full-size A8
+       buffer. Retain metrics and bound odd widths, heights and strides. */
+    uint32_t sample = 0;
+    for(uint32_t y = 0; y < glyph->box_h; y += 2u) {
         uint8_t *out = target + y * stride;
-        uint32_t pairs = glyph->box_w >> 1;
-        if(((uintptr_t)out & 1u) == 0u) {
-            uint16_t *pair_out = (uint16_t *)(uintptr_t)out;
-            while(pairs--) {
-                *pair_out++ = a4_to_a8_pair[*row++];
-            }
-            out = (uint8_t *)(uintptr_t)pair_out;
+        for(uint32_t x = 0; x < glyph->box_w; x += 2u) {
+            uint32_t shift = 6u - ((sample & 3u) << 1);
+            uint8_t alpha = ((source[sample >> 2] >> shift) & 3u) * 85u;
+            sample++;
+            out[x] = alpha;
+            if(x + 1u < glyph->box_w) out[x + 1u] = alpha;
         }
-        else {
-            while(pairs--) {
-                uint8_t packed = *row++;
-                *out++ = a4_to_a8[packed >> 4];
-                *out++ = a4_to_a8[packed & 0x0Fu];
-            }
-        }
-        if(glyph->box_w & 1u) {
-            *out = a4_to_a8[*row >> 4];
-        }
+        if(y + 1u < glyph->box_h) copy_bytes(out + stride, out, glyph->box_w);
     }
 
     cache_store(runtime, glyph, codepoint, target, stride);

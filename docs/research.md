@@ -1,7 +1,7 @@
 # Thai rendering patch research
 
-Current target: **2.3.0.24**. Its complete address map, provenance, decoder
-dispatch and validation record are in [the current rebase evidence](rebases/2.3.0.24.md).
+Current target: **2.3.2.14**. Its complete address map, provenance, decoder
+dispatch and validation record are in [the current rebase evidence](rebases/2.3.2.14.md).
 The sections below retain the 2.2.9.22 research and crash history; their numeric
 addresses describe that historical image, not the current patch.
 
@@ -61,7 +61,11 @@ contraction instead of dimming the original outline. `--thin 1` removes half a
 device pixel from each contour; `--thin 2` removes one, falling back by a
 high-resolution pixel only when a tiny mark would disappear. Production stays
 at `--thin 1` unless a preview is visually approved. Its callbacks return LVGL
-9.3 glyph descriptors and expand packed A4 pixels into LVGL's A8 draw buffer.
+9.3 glyph descriptors. On 2.3.2.14, `tools/compact_font.py` converts those
+source masks to half-resolution A2 samples, retains all eight sizes and Thai
+characters, and preserves advances, box dimensions and ordinary offsets.
+Max pooling retains significant thin strokes and the separate SARA AM dot;
+contextual alternates are raised against the actual compact pixels.
 The callback invokes the active draw-buffer handler's cache flush, matching
 LVGL's built-in bitmap-font path.
 
@@ -72,11 +76,11 @@ are documented in [Thai performance](thai-performance.md), with stock
 disassembly and reproducible instruction-count evidence.
 
 
-The firmware converts each embedded glyph from packed A4 to LVGL A8 in the
-draw buffer. Aligned rows expand two output pixels per packed byte with a
-single 16-bit store from a 256-entry pair lookup; unusual unaligned rows retain
-the byte-safe lookup path. Both preserve exact A8 values and the mandatory
-cache flush. The only context-sensitive decoder case—tone marks after upper
+The firmware expands four-level A2 samples directly into the caller's A8 draw
+buffer, replicating each sample into at most a 2×2 block. Odd widths, heights,
+alignment and padded strides are bounded by the original dimensions. This
+adds no bitmap allocation, preserves the cache flush, and produces coarser
+edges than the old A4 payload. The only context-sensitive decoder case—tone marks after upper
 Thai marks—now identifies the immediately preceding fixed-width Thai UTF-8
 sequence directly instead of re-decoding the text prefix.
 
@@ -88,7 +92,7 @@ remain unchanged. Slot capacity is derived from the largest bitmap in the
 selected size; a typical 28 px chain uses 2,768 bytes including metadata. If
 the authenticated stock allocator fails, returns outside SRAM, or any runtime
 header or slot bound is invalid, the chain attaches the original read-only font
-or the bitmap callback uses the uncached A4 path. The cache has a busy guard so
+or the bitmap callback uses the uncached A2 path. The cache has a busy guard so
 re-entrant rendering also falls back instead of sharing mutable slot state.
 
 ## Thai shaping boundary
@@ -158,9 +162,9 @@ scripts:
 The Thai fallback therefore reuses stock's integration surface while differing
 in glyph source: it appends a standard callback-based `lv_font_t` to the same
 manager-built chains (identical interface to FreeType's callback fonts), but
-serves precomputed A4-packed Noto Sans Thai bitmaps embedded in the Apollo
+serves compact A2-packed 2005_iannnnnAMD bitmaps embedded in the Apollo
 append instead of rasterizing a TTF from the un-reversed font-bank protocol.
-That keeps the patch inside one OTA, heap-free, and deterministic, at the cost
+That keeps the patch inside one OTA with bounded glyph-cache allocations and deterministic bitmaps, at the cost
 of fixed sizes (8) and coverage (132 codepoints) versus arbitrary vector
 rendering.
 
@@ -169,4 +173,9 @@ rendering.
 Injected code and font data are appended after the stock main-app payload. The
 patcher updates the main-app subheader size, TOC size, low-24-bit preamble
 length, preamble zlib CRC-32, and component CRC-32C. It refuses output beyond
-the conservative `0x007F0000` MRAM ceiling, below the OTA flag at `0x007FE000`.
+the version-authenticated OTA boundary `0x007FE000`. Stock 2.3.2.14 already
+ends at `0x007F5AAC`, above the former `0x007F0000` estimate. Its code loads
+the OTA flag at `0x007FE000` and programs the MRAM settings page at
+`0x007FF000`; the [current disassembly](rebases/2.3.2.14-integrity.asm)
+records those references. The compact candidate leaves 5,305 bytes before
+the OTA flag. This limit is specific to the authenticated version.

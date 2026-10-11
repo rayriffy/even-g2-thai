@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
+from compact_font import expand_blob
 
 from font_blob import (
     ALT_START,
@@ -47,6 +48,7 @@ def shape_for_preview(text: str) -> list[int]:
 
 
 def render(blob: bytes, size_index: int = 3) -> Image.Image:
+    blob = expand_blob(blob)
     _, _, size_count, glyph_count, _, records_offset = HEADER.unpack_from(blob)
     if not 0 <= size_index < size_count:
         raise ValueError("font size index out of range")
@@ -86,6 +88,7 @@ def render(blob: bytes, size_index: int = 3) -> Image.Image:
 
 
 def render_grid(blob: bytes, size_index: int = 3, columns: int = 10) -> Image.Image:
+    blob = expand_blob(blob)
     _, _, size_count, glyph_count, _, records_offset = HEADER.unpack_from(blob)
     if not 0 <= size_index < size_count:
         raise ValueError("size index out of range")

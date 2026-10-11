@@ -6,15 +6,15 @@ G2FLASH_ROOT="${G2FLASH_ROOT:-$ROOT/../g2flash}"
 G2FLASH_COMMIT="877c8d9490db0d3717ca012dd0f54556af3701bd"
 CACHE="$ROOT/.cache"
 BUILD="$ROOT/build"
-STOCK="$CACHE/g2_2.3.0.24.bin"
+STOCK="$CACHE/g2_2.3.2.14.bin"
 FONT="$ROOT/third_party/2005_iannnnnAMD.ttf"
 FONT_THIN_EDGES=1
 FONT_BLOB="$BUILD/thai_font.bin"
 PATCH_SPEC="$ROOT/patches/thai_patches.json"
-OUTPUT="$BUILD/g2_2.3.0.24_thai.bin"
+OUTPUT="$BUILD/g2_2.3.2.14_thai.bin"
 
-FW_URL="https://cdn.evenreal.co/firmware/1dbdf37b03a1169c384945e94d671371.bin"
-FW_SHA256="187ccf2bcc5c17a212106e8a376745511e8289c4232b634a7ea94b9bf25a0979"
+FW_URL="https://cdn.evenreal.co/firmware/7892790e40cffbae6db8a635b335e17f.bin"
+FW_SHA256="26b6067665a441b779c47f6b95427b8b4bb5f502aaf527466dadce628aeb00b2"
 FONT_SHA256="688f2ef20776a1f0286bd73bef4dd5d5c76640f4a7c4f0ea5f7c1b8d87a969b7"
 
 UPDATE_PATCHES=0
@@ -81,7 +81,7 @@ g2flash_dirty="$(git -C "$G2FLASH_ROOT" status --porcelain --untracked-files=all
   exit 1
 }
 
-fetch_verified "$FW_URL" "$STOCK" "$FW_SHA256" "stock G2 2.3.0.24 firmware"
+fetch_verified "$FW_URL" "$STOCK" "$FW_SHA256" "stock G2 2.3.2.14 firmware"
 
 if [[ "$UPDATE_PATCHES" -eq 1 ]]; then
   [[ -f "$FONT" ]] || {
@@ -97,7 +97,8 @@ if [[ "$UPDATE_PATCHES" -eq 1 ]]; then
     echo "Pillow is required to regenerate patches: python3 -m pip install -r requirements-dev.txt" >&2
     exit 1
   }
-  python3 "$ROOT/tools/font_blob.py" "$FONT" "$FONT_BLOB" --thin "$FONT_THIN_EDGES"
+  python3 "$ROOT/tools/font_blob.py" "$FONT" "$BUILD/thai_font_a4.bin" --thin "$FONT_THIN_EDGES"
+  python3 "$ROOT/tools/compact_font.py" "$BUILD/thai_font_a4.bin" "$FONT_BLOB"
   python3 "$ROOT/tools/render_preview.py" "$FONT_BLOB" "$BUILD/thai-preview.png"
   python3 "$ROOT/tools/generate_patch.py" \
     --stock "$STOCK" \

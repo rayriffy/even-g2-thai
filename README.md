@@ -1,6 +1,6 @@
 # g2-thai
 
-`g2-thai` patches the Even Realities G2 2.3.0.24 firmware with a Thai bitmap
+`g2-thai` patches the Even Realities G2 2.3.2.14 firmware with a Thai bitmap
 fallback font. It keeps the stock LVGL/FreeType font chains for every existing
 glyph and adds Thai only when the stock fonts report a miss.
 
@@ -9,7 +9,7 @@ vendor image from Even's CDN, verifies its SHA-256, applies a committed binary
 patch, verifies every EVENOTA checksum, and writes:
 
 ```text
-build/g2_2.3.0.24_thai.bin
+build/g2_2.3.2.14_thai.bin
 ```
 
 ## Build
@@ -72,9 +72,9 @@ Case-USB pins for this artifact and its matching stock rollback image
 
 The companion remains pinned to the reviewed revision with our local-file
 support. SybilSight's later removal of custom firmware support is not imported.
-The upstream WebFlasher catalog commit `21914f6b` (September 15, 2026) supplied
-the 2.3.0.24 stock provenance, independently verified against Even's CDN; see
-[`2.3.0.24 rebase evidence`](docs/rebases/2.3.0.24.md). Load either 2.3.0.24
+The upstream WebFlasher catalog commit `2fcdb888` (October 10, 2026) supplied
+the 2.3.2.14 stock provenance, independently verified against Even's CDN; see
+[`2.3.2.14 rebase evidence`](docs/rebases/2.3.2.14.md). Load either 2.3.2.14
 image from disk; the vendored companion's catalog is older.
 
 ```sh
@@ -98,8 +98,10 @@ Unknown custom files still fail closed; each build needs its own exact pins.
 
 - Thai code points `U+0E01..U+0E3A`, `U+0E3F`, and `U+0E40..U+0E5B`.
 - Eight raster sizes selected at runtime from the active stock font's line
-  height, rendered from this font at 2× source resolution with softened outer
-  edge pixels.
+  height. To fit 2.3.2.14, compact A2 bitmaps use half-resolution samples
+  with four alpha levels, expanded into the original glyph dimensions.
+  Advances and ordinary glyph positions are preserved; contextual marks
+  are raised against the compact pixels. Rendering is coarser than the old A4 build.
 - Contextual raised tone-mark alternates for `U+0E48..U+0E4B` before
   `U+0E33` SARA AM or after an upper Thai mark, preventing collisions in
   `น้ำ`, `นี้`, and future valid clusters.

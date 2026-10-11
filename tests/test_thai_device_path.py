@@ -14,18 +14,21 @@ from __future__ import annotations
 
 import json
 import struct
+import sys
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-ARTIFACT = ROOT / "build" / "g2_2.3.0.24_thai.bin"
+sys.path.insert(0, str(ROOT / "tools"))
+from compact_font import COMPACT_RECORD, expand_blob
+ARTIFACT = ROOT / "build" / "g2_2.3.2.14_thai.bin"
 SPEC = ROOT / "patches" / "thai_patches.json"
 
 LOAD = 0x437FE0
-LETTER_HELPER_SITE = 0x0049333C
-DECODE_SLOT_INDIRECT = 0x004936AC
-STOCK_CHAIN_BUILD = 0x00470B58
-LV_MALLOC = 0x0045855E
+LETTER_HELPER_SITE = 0x00493FC0
+DECODE_SLOT_INDIRECT = 0x00494330
+STOCK_CHAIN_BUILD = 0x00471238
+LV_MALLOC = 0x0047EC6A
 RAM_BASE = 0x20000000
 STACK_TOP = RAM_BASE + 0xFF000
 EMU_DONE = 0x00080000
@@ -67,9 +70,10 @@ class ThaiDevicePathTests(unittest.TestCase):
             if patch["desc"].startswith("append Thai")
         )
         start = int(metadata["font_blob_offset_in_append"])
-        cls.font_blob = append[start : start + cls.font_blob_bytes]
-        font_blob_offset = cls.payload.find(cls.font_blob)
-        if font_blob_offset < 0 or cls.payload.find(cls.font_blob, font_blob_offset + 1) >= 0:
+        cls.compact_blob = append[start : start + cls.font_blob_bytes]
+        cls.font_blob = expand_blob(cls.compact_blob)
+        font_blob_offset = cls.payload.find(cls.compact_blob)
+        if font_blob_offset < 0 or cls.payload.find(cls.compact_blob, font_blob_offset + 1) >= 0:
             raise AssertionError("font blob must occur exactly once in the main payload")
         cls.font_blob_address = LOAD + font_blob_offset
 
@@ -232,8 +236,8 @@ class ThaiDevicePathTests(unittest.TestCase):
     def test_decode_slot_matches_stock_dispatch(self) -> None:
         storage = self.read_word(DECODE_SLOT_INDIRECT)
         decoder = self.read_word(storage)
-        self.assertEqual(storage, 0x007C8120)
-        self.assertEqual(decoder, 0x0049345F)
+        self.assertEqual(storage, 0x007F0324)
+        self.assertEqual(decoder, 0x004940E3)
 
     def test_ascii_decodes_through_hook(self) -> None:
         text = self.utf8("abc")
@@ -340,10 +344,11 @@ class ThaiDevicePathTests(unittest.TestCase):
         codepoint = 0x0E01
         first = self.render_glyph(layout, runtime, codepoint)
         self.assertTrue(any(first))
-        bitmap_offset, _, _, box_h, _, _, row_bytes, _ = self.glyph_record(3, codepoint)
+        bitmap_offset, _, box_w, box_h, _, _ = COMPACT_RECORD.unpack_from(
+            self.compact_blob, 80 + (3 * 132 + codepoint - THAI_START) * 8)
         self.uc.mem_write(
             self.font_blob_address + bitmap_offset,
-            bytes(row_bytes * box_h),
+            bytes(((box_w + 1) // 2 * ((box_h + 1) // 2) + 3) // 4),
         )
         second = self.render_glyph(layout, runtime, codepoint)
         self.assertEqual(second, first)

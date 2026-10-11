@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "target_version": "2.3.2.14",
+  "stock_sha256": "26b6067665a441b779c47f6b95427b8b4bb5f502aaf527466dadce628aeb00b2",
+  "stock_url": "https://cdn.evenreal.co/firmware/7892790e40cffbae6db8a635b335e17f.bin",
+  "stock_size": 4701884,
+  "stock_md5": "7892790e40cffbae6db8a635b335e17f",
+  "archive_commit": "2fcdb888facfe9c56672cbe2a3da741b44033c44",
+  "archive_repository": "AM-Guru/evenRealities-webflasher",
+  "patched_sha256": "e6e1f569d1f50e64690cd546fbba400eed6067e0dc674d5fd3c00a1dabe5f609",
+  "patched_size": 4730711,
+  "patched_main_sha256": "e5cee9c797ed43ca9528926e38113485838a013ecd446df731e71a71f97a8625",
+  "patched_main_size": 3951463,
+  "component_count": 6,
+  "hardware_validated": false,
+  "file_delta": "0x00379BF0",
+  "payload_file_offset": 779248,
+  "decoder_dispatch": {
+    "literal": "0x00494330",
+    "storage": "0x007F0324",
+    "thumb_entry": "0x004940E3"
+  },
+  "stock_components": [
+    {
+      "name": "firmware/codec.bin",
+      "typeId": 4,
+      "size": 326092,
+      "crc32c": "bdcfeeac",
+      "sha256": "b06dfef7faa2f1e52d2aacd07958d4b96ffc36dca5077ac9149e48f19fc9c4d0"
+    },
+    {
+      "name": "firmware/ble_em9305.bin",
+      "typeId": 5,
+      "size": 211948,
+      "crc32c": "c074baf7",
+      "sha256": "91a38f7fc05555f86181ecb22b363e3239bfcaaa2ff6171e98524ae64821eca9"
+    },
+    {
+      "name": "firmware/touch.bin",
+      "typeId": 3,
+      "size": 34720,
+      "crc32c": "903ca49a",
+      "sha256": "c14456cd4d432815d79700b251c9a575f75c76a3710f4148c0df6ddba4cb7ba2"
+    },
+    {
+      "name": "firmware/box.bin",
+      "typeId": 6,
+      "size": 55784,
+      "crc32c": "7d443be0",
+      "sha256": "36ca0c13558f252af286ae2b36b5e576d087d21d37b15d778e7da9f502a70374"
+    },
+    {
+      "name": "ota/s200_bootloader.bin",
+      "typeId": 1,
+      "size": 149760,
+      "crc32c": "cb153beb",
+      "sha256": "22a2b98e606b4d296e957a3a8b600a2158497638d79485c817c2025536329ba7"
+    },
+    {
+      "name": "ota/s200_firmware_ota.bin",
+      "typeId": 0,
+      "size": 3922636,
+      "crc32c": "fbdb3e67",
+      "sha256": "d6d29ec6a6d7d3f7e0abb260c54493e2e5dd0ed978346dc41061ee6522d40fc6"
+    }
+  ],
+  "anchors": [
+    {
+      "role": "chain builder",
+      "old_address": "0x00470B58",
+      "new_address": "0x00471238",
+      "anchor_offset": 12,
+      "bytes": "80070dd5dff85009019041200090dff84c39dff87c2adff8"
+    },
+    {
+      "role": "font call 1",
+      "old_address": "0x004714E8",
+      "new_address": "0x00471BC8",
+      "anchor_offset": 0,
+      "bytes": "fff736fb20602068002805d02068fff76afd734908601fe0"
+    },
+    {
+      "role": "font call 2",
+      "old_address": "0x00471546",
+      "new_address": "0x00471C26",
+      "anchor_offset": 0,
+      "bytes": "fff707fb20602068002805d02068fff73bfd614908601fe0"
+    },
+    {
+      "role": "letter pair helper",
+      "old_address": "0x0049333C",
+      "new_address": "0x00493FC0",
+      "anchor_offset": 0,
+      "bytes": "2de9f04105000e0014001f00dff8608339002800d8f80020904730603068002806d0002138682844d8f80020904700e000202060bde8f0810178090601d4012015e0017811f0e001c02901d102200ee0017811f0f001e02901d1032007e0007810f0f800f02801d1042000e00020704781b0802816d3b0f5006f15d201008909"
+    },
+    {
+      "role": "UTF-8 decoder",
+      "old_address": "0x0049345E",
+      "new_address": "0x004940E2",
+      "anchor_offset": 0,
+      "bytes": "81b0002200230093002900d16946002803d00b68c35c002b01d110009de00b68c35c1b0605d40a68825c0868401c086092e00b68c35c13f0e003c02b18d10a68835c13f01f039b010a68521c0a600a68825c12f0c002802a01d000207de00a68825c12f03f02d2180868401c086073e00b68c35c13f0f003e02b29d10a68835c"
+    },
+    {
+      "role": "glyph release",
+      "old_address": "0x004EA30C",
+      "new_address": "0x004EB390",
+      "anchor_offset": 32,
+      "bytes": "00205ff0ff310860fae7e869002814d02c68002c11d0a06800280ed0724ea069"
+    },
+    {
+      "role": "glyph descriptor",
+      "old_address": "0x004EA368",
+      "new_address": "0x004EB3EC",
+      "anchor_offset": 0,
+      "bytes": "2de9fe4f070091469846002f10d1624802906248019062480090674b5a226249"
+    },
+    {
+      "role": "allocator",
+      "old_address": "0x0045855E",
+      "new_address": "0x0047EC6A",
+      "anchor_offset": 0,
+      "bytes": "70b504000025824e4ff47a713068c4f738f9002809d121007f48006866f0cefa"
+    }
+  ],
+  "install_boundary": {
+    "stock_end": "0x007F5AAC",
+    "ota_flag": "0x007FE000",
+    "settings_page": "0x007FF000",
+    "safe_ceiling": "0x007FE000"
+  },
+  "font_storage": "half-resolution A2; user selected smaller bitmaps, all Thai characters and eight sizes"
+}

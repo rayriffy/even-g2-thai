@@ -12,29 +12,31 @@ import sys
 import zlib
 from pathlib import Path
 
-STOCK_SHA256 = "187ccf2bcc5c17a212106e8a376745511e8289c4232b634a7ea94b9bf25a0979"
+STOCK_SHA256 = "26b6067665a441b779c47f6b95427b8b4bb5f502aaf527466dadce628aeb00b2"
 FONT_SHA256 = "688f2ef20776a1f0286bd73bef4dd5d5c76640f4a7c4f0ea5f7c1b8d87a969b7"
 FONT_SOURCE_COMMIT = "vendored:third_party/2005_iannnnnAMD.ttf"
 MAINAPP_SUFFIX = "ota/s200_firmware_ota.bin"
 APP_LOAD_ADDR = 0x00438000
 APP_PREAMBLE = 0x20
-APP_MAX_END = 0x007F0000
-G2_FILE_DELTA = 0x379BF5
+# Version-specific: stock ends at 0x7F5AAC, the OTA word is 0x7FE000,
+# and the MRAM settings page is 0x7FF000. See the rebase disassembly.
+APP_MAX_END = 0x007FE000
+G2_FILE_DELTA = 0x379BF0
 FONT_DSC_MAGIC = 0xA11D0001
 FONT_BITMAP_MAGIC = 0xA11D0002
 FONT_DATA_MAGIC = 0xA11D0003
 HOOK_SITES = {
-    0x004714E8: bytes.fromhex("ff f7 36 fb"),
-    0x00471546: bytes.fromhex("ff f7 07 fb"),
+    0x00471BC8: bytes.fromhex("ff f7 36 fb"),
+    0x00471C26: bytes.fromhex("ff f7 07 fb"),
 }
-TEXT_HELPER_SITE = (0x0049333C, bytes.fromhex("2d e9 f0 41"))
+TEXT_HELPER_SITE = (0x00493FC0, bytes.fromhex("2d e9 f0 41"))
 GLYPH_LOOKUP_SITE = (
-    0x004EA368,
+    0x004EB3EC,
     bytes.fromhex("2d e9 fe 4f 07 00 91 46 98 46 00 2f 10 d1 62 48"),
 )
 LV_MALLOC_SITE = (
-    0x0045855E,
-    bytes.fromhex("70 b5 04 00 00 25 6c 4e 4f f4 7a 71 30 68 ea f7"),
+    0x0047EC6A,
+    bytes.fromhex("70 b5 04 00 00 25 82 4e 4f f4 7a 71 30 68 c4 f7"),
 )
 
 
@@ -148,6 +150,8 @@ def replace_words(blob: bytearray, old: int, new: int, expected: int) -> None:
 def build_spec(stock: bytes, font_blob: bytes, build: dict[str, object]) -> dict[str, object]:
     if hashlib.sha256(stock).hexdigest() != STOCK_SHA256:
         raise ValueError("stock firmware SHA-256 mismatch")
+    if struct.unpack_from("<IHHHHI", font_blob) != (0x49414854, 3, 8, 132, 8, 80):
+        raise ValueError("expected compact A2 font format and eight metric sets")
     malloc_address, malloc_expected = LV_MALLOC_SITE
     malloc_offset = malloc_address - G2_FILE_DELTA
     malloc_actual = bytes(stock[malloc_offset : malloc_offset + len(malloc_expected)])
@@ -259,11 +263,11 @@ def build_spec(stock: bytes, font_blob: bytes, build: dict[str, object]) -> dict
 
     return {
         "schema_version": 1,
-        "base": "g2_2.3.0.24.bin",
+        "base": "g2_2.3.2.14.bin",
         "base_sha256": STOCK_SHA256,
         "output_sha256": hashlib.sha256(data).hexdigest(),
         "metadata": {
-            "target": "Even Realities G2 2.3.0.24",
+            "target": "Even Realities G2 2.3.2.14",
             "glyph_lookup_hook_site": f"0x{lookup_site:08X}",
             "glyph_lookup_wrapper_address": f"0x{lookup_address:08X}",
             "component_count": struct.unpack_from("<I", stock, 8)[0],
@@ -276,6 +280,7 @@ def build_spec(stock: bytes, font_blob: bytes, build: dict[str, object]) -> dict
             "code_bytes": len(code),
             "font_blob_offset_in_append": font_offset - old_size,
             "font_blob_bytes": len(font_blob),
+            "font_storage": "half-resolution A2; eight full-size metric sets",
             "font_blob_sha256": hashlib.sha256(font_blob).hexdigest(),
             "font_source_sha256": FONT_SHA256,
             "font_source_commit": FONT_SOURCE_COMMIT,
