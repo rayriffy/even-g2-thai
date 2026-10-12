@@ -40,20 +40,26 @@ jobs:
       - name: Build and verify
         run: make check
 
+      - name: Prepare verified archive inputs
+        id: artifact
+        run: python tools/prepare_ci_artifact.py
+
       - name: Record artifact hashes
         run: |
-          sha256sum build/g2_2.3.0.24_thai.bin
-          sha256sum patches/thai_patches.json
+          sha256sum "${{ steps.artifact.outputs.firmware }}" patches/thai_patches.json > build/SHA256SUMS
+          cat build/SHA256SUMS
 
       - name: Upload firmware artifact
         uses: actions/upload-artifact@v4
         with:
-          name: g2-thai-2.3.0.24-${{ github.sha }}
+          name: g2-thai-${{ steps.artifact.outputs.version }}-${{ github.sha }}
           if-no-files-found: error
           retention-days: 90
           path: |
-            build/g2_2.3.0.24_thai.bin
+            ${{ steps.artifact.outputs.firmware }}
+            build/SHA256SUMS
             build/thai-preview.png
             patches/thai_patches.json
-            docs/rebases/2.3.0.24.json
-            docs/rebases/2.3.0.24.md
+            ${{ steps.artifact.outputs.rebase_json }}
+            ${{ steps.artifact.outputs.rebase_doc }}
+            fonts/maitree/OFL.txt

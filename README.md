@@ -42,6 +42,12 @@ make check
 Patch regeneration also writes `build/thai-preview.png`, rendered from the
 same packed glyph payload and positioning logic used by the firmware callback.
 
+GitHub Actions derives archive paths and the artifact name from the committed
+patch's firmware version. `python3 tools/prepare_ci_artifact.py` verifies the
+built image against its patch/rebase digests and renders the preview from the
+embedded font before packaging the firmware, checksum manifest, current rebase
+evidence and font license. This keeps archive inputs aligned after a rebase.
+
 The production font is [Maitree ExtraLight](fonts/maitree/Maitree-ExtraLight.ttf),
 the lightest published Google Fonts weight (CSS 200), pinned by SHA-256 and
 Google Fonts commit. Its original outlines, advances and hinting remain intact.
