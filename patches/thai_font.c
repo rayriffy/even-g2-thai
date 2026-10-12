@@ -1,15 +1,14 @@
-/* LVGL 9.3 Thai fallback for Even Realities G2 firmware 2.3.2.14. */
+/* Maitree ExtraLight fallback for G2 2.3.2.14, full-resolution A1. */
 #include <stdbool.h>
 #include <stdint.h>
 
 #define THAI_START 0x0E00u
 #define THAI_COUNT 0x80u
 #define ALT_START 0xF700u
-#define ALT_COUNT 4u
-#define GLYPH_COUNT (THAI_COUNT + ALT_COUNT)
 #define TONE_MARK_START 0x0E48u
 #define SARA_AM 0x0E33u
 #define SIZE_COUNT 8u
+#include "thai_shaping.h"
 #define FONT_DSC_MAGIC 0xA11D0001u
 #define FONT_BITMAP_MAGIC 0xA11D0002u
 #define FONT_DATA_MAGIC 0xA11D0003u
@@ -41,7 +40,7 @@ typedef struct {
     int8_t ofs_x;
     int8_t ofs_y;
 } thai_glyph_t;
-_Static_assert(sizeof(thai_glyph_t) == 8, "compact font record ABI");
+_Static_assert(sizeof(thai_glyph_t) == 8, "unpacked internal glyph metrics");
 
 typedef void *(*stock_chain_build_fn)(void *configs, uint32_t count);
 typedef uint32_t (*stock_decode_fn)(const char *text, uint32_t *offset);
@@ -109,6 +108,7 @@ static int writable_ram_range(const void *pointer, uint32_t size) {
            address <= WRITABLE_RAM_END - size;
 }
 
+__attribute__((noinline))
 static void copy_bytes(uint8_t *destination, const uint8_t *source, uint32_t count) {
     if((((uintptr_t)destination | (uintptr_t)source) & 3u) == 0u) {
         while(count >= 4u) {
@@ -133,23 +133,31 @@ static const uint32_t *font_for_line_height(uint32_t height) {
     return thai_font_48;
 }
 
-static const thai_glyph_t *glyph_record(const uint32_t *font, uint32_t codepoint) {
+__attribute__((noinline))
+static int glyph_record(const uint32_t *font, uint32_t codepoint, thai_glyph_t *glyph) {
     const uint8_t *data = (const uint8_t *)(uintptr_t)thai_font_data_address;
-    uint32_t glyph_index;
-    if(codepoint >= THAI_START && codepoint < THAI_START + THAI_COUNT) {
-        glyph_index = codepoint - THAI_START;
-    }
-    else if(codepoint >= ALT_START && codepoint < ALT_START + ALT_COUNT) {
-        glyph_index = THAI_COUNT + codepoint - ALT_START;
-    }
-    else {
-        return 0;
-    }
+    int glyph_index = glyph_index_for(codepoint);
+    if(glyph_index < 0) return 0;
     uint32_t size_index = font[8];
     if(size_index >= SIZE_COUNT) return 0;
     uint32_t records_offset = read_u32(data + 12);
-    uint32_t record_index = size_index * GLYPH_COUNT + glyph_index;
-    return (const thai_glyph_t *)(data + records_offset + record_index * 8u);
+    const uint8_t *record = data + records_offset + (size_index * GLYPH_COUNT + (uint32_t)glyph_index) * 6u;
+    uint32_t metrics = read_u32(record + 2);
+    glyph->bitmap_offset = read_u16(record);
+    glyph->advance = metrics & 63u;
+    glyph->box_w = (metrics >> 6) & 63u;
+    glyph->box_h = (metrics >> 12) & 63u;
+    int x = (metrics >> 18) & 63u, y = (metrics >> 24) & 127u;
+    glyph->ofs_x = (int8_t)(x >= 32 ? x - 64 : x);
+    glyph->ofs_y = (int8_t)(y >= 64 ? y - 128 : y);
+    if(codepoint >= TAG_START && codepoint < TAG_END) {
+        static const int8_t xs[] = {0, -38, -17, -25}, ys[] = {0, -20, 10, 0};
+        uint32_t group = (codepoint - TAG_START) >> 8;
+        uint32_t size = read_u16(data + 16 + size_index * 8u);
+        glyph->ofs_x += rounded_units(xs[group >> 2], size);
+        glyph->ofs_y += rounded_units(ys[group & 3u], size);
+    }
+    return glyph->box_w && glyph->box_h;
 }
 
 static uint16_t cache_slot_bytes_for_font(const uint32_t *font) {
@@ -159,11 +167,10 @@ static uint16_t cache_slot_bytes_for_font(const uint32_t *font) {
     uint32_t records_offset = read_u32(data + 12);
     uint32_t largest = 0;
     for(uint32_t index = 0; index < GLYPH_COUNT; index++) {
-        const thai_glyph_t *glyph = (const thai_glyph_t *)(
-            data + records_offset + (size_index * GLYPH_COUNT + index) * 8u);
-        if(!glyph->box_w) continue;
-        uint32_t cache_stride = ((uint32_t)glyph->box_w + 3u) & ~3u;
-        uint32_t bytes = cache_stride * glyph->box_h;
+        uint32_t metrics = read_u32(data + records_offset + (size_index * GLYPH_COUNT + index) * 6u + 2u);
+        uint32_t width = (metrics >> 6) & 63u, height = (metrics >> 12) & 63u;
+        uint32_t cache_stride = (width + 3u) & ~3u;
+        uint32_t bytes = cache_stride * height;
         if(bytes > largest) largest = bytes;
     }
     if(!largest || largest > THAI_CACHE_BUDGET || largest > 0xFFFFu) return 0;
@@ -276,8 +283,9 @@ __attribute__((used, noinline))
 bool thai_get_glyph_dsc(const uint32_t *font, void *glyph_dsc,
                         uint32_t codepoint, uint32_t next_codepoint) {
     (void)next_codepoint;
-    const thai_glyph_t *glyph = glyph_record(font, codepoint);
-    if(!glyph || !glyph->box_w) return false;
+    thai_glyph_t metrics;
+    if(!glyph_record(font, codepoint, &metrics)) return false;
+    const thai_glyph_t *glyph = &metrics;
 
     uint8_t *out = (uint8_t *)glyph_dsc;
     /* Stock descriptors are word-aligned. Preserve the byte-safe path for
@@ -307,17 +315,19 @@ bool thai_get_glyph_dsc(const uint32_t *font, void *glyph_dsc,
     return true;
 }
 
+#include "thai_bitmap.h"
+
 __attribute__((used, noinline))
 const void *thai_get_glyph_bitmap(void *glyph_dsc, void *draw_buf) {
     if(!glyph_dsc || !draw_buf) return 0;
     uint8_t *dsc = (uint8_t *)glyph_dsc;
     const uint32_t *font = (const uint32_t *)(uintptr_t)read_u32(dsc);
     uint32_t codepoint = read_u32(dsc + GLYPH_DSC_GID_OFFSET);
-    const thai_glyph_t *glyph = glyph_record(font, codepoint);
-    if(!glyph || !glyph->box_w) return 0;
+    thai_glyph_t metrics;
+    if(!glyph_record(font, codepoint, &metrics)) return 0;
+    const thai_glyph_t *glyph = &metrics;
 
     const uint8_t *font_data = (const uint8_t *)(uintptr_t)thai_font_data_address;
-    const uint8_t *source = font_data + glyph->bitmap_offset;
     uint8_t *draw = (uint8_t *)draw_buf;
     uint16_t stride = read_u16(draw + 8);
     uint8_t *target = (uint8_t *)(uintptr_t)read_u32(draw + 16);
@@ -332,20 +342,7 @@ const void *thai_get_glyph_bitmap(void *glyph_dsc, void *draw_buf) {
         return draw_buf;
     }
 
-    /* Half-resolution A2, expanded directly into the full-size A8
-       buffer. Retain metrics and bound odd widths, heights and strides. */
-    uint32_t sample = 0;
-    for(uint32_t y = 0; y < glyph->box_h; y += 2u) {
-        uint8_t *out = target + y * stride;
-        for(uint32_t x = 0; x < glyph->box_w; x += 2u) {
-            uint32_t shift = 6u - ((sample & 3u) << 1);
-            uint8_t alpha = ((source[sample >> 2] >> shift) & 3u) * 85u;
-            sample++;
-            out[x] = alpha;
-            if(x + 1u < glyph->box_w) out[x + 1u] = alpha;
-        }
-        if(y + 1u < glyph->box_h) copy_bytes(out + stride, out, glyph->box_w);
-    }
+    if(!decode_a1(font_data, glyph, target, stride)) return 0;
 
     cache_store(runtime, glyph, codepoint, target, stride);
 
@@ -362,13 +359,6 @@ static stock_decode_fn stock_decoder(void) {
     return (stock_decode_fn)(uintptr_t)read_u32((const uint8_t *)(uintptr_t)storage);
 }
 
-static int is_upper_mark(uint32_t codepoint) {
-    return codepoint == 0x0E31u ||
-           (codepoint >= 0x0E34u && codepoint <= 0x0E37u) ||
-           codepoint == 0x0E47u || codepoint == 0x0E4Cu ||
-           codepoint == 0x0E4Du || codepoint == 0x0E4Eu;
-}
-
 __attribute__((used, noinline))
 void thai_text_encoded_letter_next_2(const char *text, uint32_t *letter,
                                      uint32_t *letter_next, uint32_t *offset) {
@@ -379,21 +369,7 @@ void thai_text_encoded_letter_next_2(const char *text, uint32_t *letter,
     uint32_t next = 0;
     if(decode) current = decode(text, active_offset);
     if(decode && current) next = decode(text + *active_offset, 0);
-    if(current >= TONE_MARK_START && current < TONE_MARK_START + ALT_COUNT) {
-        int raise_tone = next == SARA_AM;
-        if(!raise_tone && *active_offset >= 6u) {
-            const uint8_t *previous = (const uint8_t *)text + *active_offset - 6u;
-            if(previous[0] == 0xE0u &&
-               previous[1] >= 0xB8u && previous[1] <= 0xB9u &&
-               (previous[2] & 0xC0u) == 0x80u) {
-                uint32_t codepoint = 0x0E00u +
-                                     ((uint32_t)(previous[1] - 0xB8u) << 6) +
-                                     (uint32_t)(previous[2] - 0x80u);
-                raise_tone = is_upper_mark(codepoint);
-            }
-        }
-        if(raise_tone) current = ALT_START + current - TONE_MARK_START;
-    }
+    current = shape_thai(text, current, next, *active_offset);
     *letter = current;
     *letter_next = next;
 }

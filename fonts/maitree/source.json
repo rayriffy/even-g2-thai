@@ -1,0 +1,13 @@
+{
+  "family": "Maitree",
+  "style": "ExtraLight",
+  "weight": 200,
+  "version": "1.003",
+  "license": "OFL-1.1",
+  "repository": "https://github.com/google/fonts",
+  "commit": "bd8f81ddb5c74d5c8897b36ad88b440266245103",
+  "path": "ofl/maitree/Maitree-ExtraLight.ttf",
+  "sha256": "aaa310f9bc913882863b1d39bd70978b7d068ac831ef3789bd921f781392343d",
+  "opentype_weight_class": 275,
+  "weight_note": "Google Fonts CSS weight 200; original OS/2 weight class 275, preserved unchanged"
+}

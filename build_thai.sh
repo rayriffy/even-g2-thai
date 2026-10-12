@@ -7,15 +7,14 @@ G2FLASH_COMMIT="877c8d9490db0d3717ca012dd0f54556af3701bd"
 CACHE="$ROOT/.cache"
 BUILD="$ROOT/build"
 STOCK="$CACHE/g2_2.3.2.14.bin"
-FONT="$ROOT/third_party/2005_iannnnnAMD.ttf"
-FONT_THIN_EDGES=1
+FONT="$ROOT/fonts/maitree/Maitree-ExtraLight.ttf"
 FONT_BLOB="$BUILD/thai_font.bin"
 PATCH_SPEC="$ROOT/patches/thai_patches.json"
 OUTPUT="$BUILD/g2_2.3.2.14_thai.bin"
 
 FW_URL="https://cdn.evenreal.co/firmware/7892790e40cffbae6db8a635b335e17f.bin"
 FW_SHA256="26b6067665a441b779c47f6b95427b8b4bb5f502aaf527466dadce628aeb00b2"
-FONT_SHA256="688f2ef20776a1f0286bd73bef4dd5d5c76640f4a7c4f0ea5f7c1b8d87a969b7"
+FONT_SHA256="aaa310f9bc913882863b1d39bd70978b7d068ac831ef3789bd921f781392343d"
 
 UPDATE_PATCHES=0
 if [[ "${1:-}" == "--update-patches" ]]; then
@@ -92,13 +91,12 @@ if [[ "$UPDATE_PATCHES" -eq 1 ]]; then
     echo "local Thai font SHA-256 mismatch at $FONT" >&2
     exit 1
   }
-  echo "verified local 2005_iannnnnAMD Thai font"
-  python3 -c 'import PIL' 2>/dev/null || {
-    echo "Pillow is required to regenerate patches: python3 -m pip install -r requirements-dev.txt" >&2
+  echo "verified Maitree ExtraLight 200 source"
+  python3 -c 'import PIL, fontTools' 2>/dev/null || {
+    echo "Pillow and fontTools are required to regenerate patches: python3 -m pip install -r requirements-dev.txt" >&2
     exit 1
   }
-  python3 "$ROOT/tools/font_blob.py" "$FONT" "$BUILD/thai_font_a4.bin" --thin "$FONT_THIN_EDGES"
-  python3 "$ROOT/tools/compact_font.py" "$BUILD/thai_font_a4.bin" "$FONT_BLOB"
+  python3 "$ROOT/tools/pixel_font.py" "$FONT_BLOB" --source "$FONT" --report "$BUILD/thai-pixel-font-report.json"
   python3 "$ROOT/tools/render_preview.py" "$FONT_BLOB" "$BUILD/thai-preview.png"
   python3 "$ROOT/tools/generate_patch.py" \
     --stock "$STOCK" \

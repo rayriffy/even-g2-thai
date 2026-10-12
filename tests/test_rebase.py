@@ -84,7 +84,7 @@ class RebaseTests(unittest.TestCase):
 
     def test_legacy_font_format_cannot_generate_the_new_callback(self):
         legacy_header = struct.pack("<IHHHHI", 0x49414854, 2, 8, 132, 12, 80)
-        with self.assertRaisesRegex(ValueError, "compact A2"):
+        with self.assertRaisesRegex(ValueError, "full-resolution A1"):
             build_spec(self.stock, legacy_header, {})
 
     def test_valid_checksums_do_not_allow_an_image_past_the_ota_flag(self):

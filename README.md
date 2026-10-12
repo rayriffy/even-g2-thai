@@ -1,8 +1,8 @@
 # g2-thai
 
 `g2-thai` patches the Even Realities G2 2.3.2.14 firmware with a Thai bitmap
-fallback font. It keeps the stock LVGL/FreeType font chains for every existing
-glyph and adds Thai only when the stock fonts report a miss.
+fallback font. It uses Maitree ExtraLight at native pixel resolution and preserves the stock
+LVGL/FreeType paths for Latin, Japanese, and other unrelated glyphs.
 
 The project does not redistribute Even's firmware. The build downloads the
 vendor image from Even's CDN, verifies its SHA-256, applies a committed binary
@@ -42,15 +42,19 @@ make check
 Patch regeneration also writes `build/thai-preview.png`, rendered from the
 same packed glyph payload and positioning logic used by the firmware callback.
 
-The Thai source font is the user-supplied
-[`third_party/2005_iannnnnAMD.ttf`](third_party/2005_iannnnnAMD.ttf), verified
-by SHA-256 before patch regeneration. Its embedded copyright is "All rights
-reserved" and it exposes no license field. Its inclusion in this repository is
-user-authorized for CI reproduction; do not reuse or redistribute it outside
-this project without the font holder's permission. Regeneration requires Pillow
-with Raqm: it extracts each combining mark from a shaped `ก + mark` raster,
-removing the font's dotted-circle teaching scaffold before embedding the
-fallback glyph.
+The production font is [Maitree ExtraLight](fonts/maitree/Maitree-ExtraLight.ttf),
+the lightest published Google Fonts weight (CSS 200), pinned by SHA-256 and
+Google Fonts commit. Its original outlines, advances and hinting remain intact.
+The [OFL license](fonts/maitree/OFL.txt) and [source provenance](fonts/maitree/source.json)
+are vendored with it. Regeneration uses Pillow 11.3.0, FreeType 2.13.3 and
+fontTools 4.66.1. It uses native monochrome rasterization without erosion,
+skeletonization or bitmap enlargement.
+
+[Thai font research](docs/thai-pixel-font.md) documents the stock renderer,
+Maitree's contextual vowel/tone forms, สระลอย checks, and the lossless storage.
+The earlier user-supplied AMD font remains only for historical comparison tests.
+Its embedded copyright is "All rights reserved" with no license field; the
+existing permission covers this project's reproduction, not reuse elsewhere.
 
 ## Firmware updates and rebasing
 
@@ -97,18 +101,18 @@ Unknown custom files still fail closed; each build needs its own exact pins.
 ## Scope and current boundary
 
 - Thai code points `U+0E01..U+0E3A`, `U+0E3F`, and `U+0E40..U+0E5B`.
-- Eight raster sizes selected at runtime from the active stock font's line
-  height. To fit 2.3.2.14, compact A2 bitmaps use half-resolution samples
-  with four alpha levels, expanded into the original glyph dimensions.
-  Advances and ordinary glyph positions are preserved; contextual marks
-  are raised against the compact pixels. Rendering is coarser than the old A4 build.
-- Contextual raised tone-mark alternates for `U+0E48..U+0E4B` before
-  `U+0E33` SARA AM or after an upper Thai mark, preventing collisions in
-  `น้ำ`, `นี้`, and future valid clusters.
-- Zero-advance, anchored combining marks and synthetic U+0E33 SARA AM.
-- No HarfBuzz/GPOS engine is added. Thai glyphs render, but complex mark
-  positioning outside the implemented Unicode mark-class rules can differ from phone
-  typography.
+- Eight native sizes: 16, 20, 24, 28, 32, 36, 40 and 48. Binary A1 pixels
+  use lossless row/tile storage; every stored pixel decodes exactly. The fixed
+  stock integration line heights and baselines remain unchanged.
+- Zero-advance vowels and tones use Maitree's mark attachments, including
+  narrower forms on ป/ฝ/ฟ, tail variants for ญ/ฐ/ฎ/ฏ, and the shorter ฬ finial
+  under upper marks. SARA AM preserves its nikhahit below the preceding tone.
+- The patch implements a finite set of font-specific GSUB/GPOS rules with
+  51 contextual glyphs. HarfBuzz is used only as an independent build-time
+  research oracle; no general shaping engine runs on the glasses. Tests
+  compare 1,936 reference clusters on all eight grids and execute the final
+  decoder and bitmap callbacks under emulation.
+- Advances follow Maitree instead of the earlier font; Thai text wrapping can change.
 - Offline firmware construction and checksum verification are automated.
   Real-glass rendering and recovery remain hardware validation gates.
 
@@ -121,4 +125,4 @@ Custom firmware voids the warranty and can brick a lens. Building never
 connects to the glasses. Flashing is a separate, explicit command and should be
 preceded by the dry-run and rollback preparation in the flashing guide.
 
-Code is MIT licensed. Generated Noto Sans Thai bitmap data is OFL-1.1.
+Code is MIT licensed. Maitree and its generated bitmap data are OFL-1.1.

@@ -24,6 +24,7 @@ from font_blob import (
 )
 from generate_patch import LV_MALLOC_SITE, encode_bl, encode_bw
 from render_preview import shape_for_preview
+from maitree_shaping import ALT_COUNT, untag
 from verify_firmware import verify
 
 
@@ -47,7 +48,7 @@ class ThaiPatchTests(unittest.TestCase):
         magic, version, sizes, glyphs, record_size, records_offset = HEADER.unpack_from(
             self.font_blob
         )
-        self.assertEqual((magic, version, sizes, glyphs, record_size), (MAGIC, 2, 8, 132, RECORD.size))
+        self.assertEqual((magic, version, sizes, glyphs, record_size), (MAGIC, 2, 8, THAI_COUNT + ALT_COUNT, RECORD.size))
         self.assertEqual(records_offset, HEADER.size + sizes * SIZE_RECORD.size)
 
     def test_thin_mask_erodes_stroke_geometry(self) -> None:
@@ -111,7 +112,8 @@ class ThaiPatchTests(unittest.TestCase):
                     self.font_blob,
                     row + (THAI_COUNT + alternate_index) * RECORD.size,
                 )
-                self.assertEqual(alternate[0], base[0])
+                self.assertEqual(alternate[1], 0)
+                self.assertGreater(alternate[2] * alternate[3], 0)
                 self.assertGreater(alternate[5], base[5])
                 alternate_pixels = self._glyph_pixels(alternate)
                 self.assertTrue(alternate_pixels.isdisjoint(sara_pixels))
@@ -120,10 +122,10 @@ class ThaiPatchTests(unittest.TestCase):
                 )
 
     def test_sara_am_pair_maps_to_contextual_tone(self) -> None:
-        shaped = shape_for_preview("น้ำ")
-        self.assertEqual(shaped, [0x0E19, ALT_START + 1, 0x0E33])
-        self.assertEqual(shape_for_preview("น้า"), [0x0E19, 0x0E49, 0x0E32])
-        self.assertEqual(shape_for_preview("นี้"), [0x0E19, 0x0E35, ALT_START + 1])
+        shaped = [untag(cp) if 0xF0000 <= cp < 0xF1000 else cp for cp in shape_for_preview("น้ำ")]
+        self.assertEqual(shaped, [0x0E19, ALT_START + 1, ALT_START + 28])
+        self.assertEqual([untag(cp) if 0xF0000 <= cp < 0xF1000 else cp for cp in shape_for_preview("น้า")], [0x0E19, 0x0E49, 0x0E32])
+        self.assertEqual([untag(cp) if 0xF0000 <= cp < 0xF1000 else cp for cp in shape_for_preview("นี้")], [0x0E19, 0x0E35, ALT_START + 1])
 
     def test_sara_am_includes_nikhahit_above_sara_aa(self) -> None:
         _, _, sizes, glyphs, _, records_offset = HEADER.unpack_from(self.font_blob)
@@ -234,7 +236,7 @@ class ThaiPatchTests(unittest.TestCase):
         self.assertNotIn("STOCK_UTF8_NEXT_THUMB", source)
         self.assertIn("uint32_t *active_offset = offset ? offset : &local_offset;", source)
         self.assertIn("next = decode(text + *active_offset, 0);", source)
-        self.assertIn("if(!raise_tone && *active_offset >= 6u)", source)
+        self.assertIn("current = shape_thai(text, current, next, *active_offset);", source)
         self.assertNotIn("previous_codepoint(", source)
         self.assertIn("uint16_t bitmap_offset;", source)
         self.assertIn("static int cache_restore(", source)

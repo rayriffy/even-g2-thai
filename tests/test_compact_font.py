@@ -17,12 +17,9 @@ class CompactFontTests(unittest.TestCase):
         cls.compact = compact_blob(cls.original)
         cls.expanded = expand_blob(cls.compact)
 
-    def test_current_spec_reproduces_from_pinned_font(self):
-        spec = json.loads((ROOT / "patches/thai_patches.json").read_text())
-        append = next(bytes.fromhex(p["new"]) for p in spec["patches"]
-                      if p["desc"].startswith("append Thai"))
-        offset = spec["metadata"]["font_blob_offset_in_append"]
-        self.assertEqual(append[offset:], self.compact)
+    def test_legacy_a2_codec_remains_readable_for_comparison(self):
+        self.assertEqual(HEADER.unpack_from(self.compact)[1], 3)
+        self.assertEqual(HEADER.unpack_from(self.expanded)[1], 2)
         self.assertLess(len(self.compact), 25000)
 
     def test_all_sizes_keep_coverage_advance_dimensions_and_base_positions(self):

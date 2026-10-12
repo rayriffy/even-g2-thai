@@ -3,6 +3,7 @@ import struct
 import unittest
 
 from font_perf_fixture import FontFixture, LOOKUP
+from maitree_shaping import ALT_COUNT, GLYPH_COUNT, TAG_START
 
 
 class ThaiLookupTests(unittest.TestCase):
@@ -42,7 +43,7 @@ class ThaiLookupTests(unittest.TestCase):
 
     def test_missing_thai_and_unrelated_scripts_retain_stock_placeholders(self):
         root, native = self.f.chain()
-        for cp in (0xE00, 0xE3B, 0xF704, 0x4E2D, 0xAC00, 0x1F600):
+        for cp in (0xE00, 0xE3B, 0xF700 + ALT_COUNT, TAG_START + GLYPH_COUNT, 0xE000, 0xE012, 0xFF08, 0x3042, 0x4E2D, 0xAC00, 0x1F600):
             before = len(self.f.callbacks)
             result, raw = self.f.lookup(root, cp)
             self.assertEqual(result, 0)
@@ -68,7 +69,7 @@ class ThaiLookupTests(unittest.TestCase):
     def test_aligned_and_unaligned_descriptors_match_all_glyphs(self):
         for size, layout in self.f.fonts.items():
             # Use immutable fonts so descriptor pointers match across calls.
-            for cp in list(range(0xE00, 0xE80)) + list(range(0xF700, 0xF704)):
+            for cp in list(range(0xE00, 0xE80)) + list(range(0xF700, 0xF700 + ALT_COUNT)):
                 vm = self.f.vm
                 before = vm.ram_next
                 aligned = self.f.lookup(layout['address'], cp)
@@ -81,7 +82,7 @@ class ThaiLookupTests(unittest.TestCase):
         root, _ = self.f.chain(runtime=False)
         vm = self.f.vm
         patched = bytes(vm.uc.mem_read(LOOKUP, 4))
-        for cp in list(range(0xE00, 0xE80)) + list(range(0xF700, 0xF704)):
+        for cp in list(range(0xE00, 0xE80)) + list(range(0xF700, 0xF700 + ALT_COUNT)):
             expected = self.f.lookup(root, cp)
             vm.uc.mem_write(LOOKUP, bytes.fromhex('2de9fe4f'))
             self.assertEqual(self.f.lookup(root, cp), expected)

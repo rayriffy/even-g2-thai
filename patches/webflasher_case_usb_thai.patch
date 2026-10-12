@@ -1,12 +1,13 @@
 diff --git a/README.md b/README.md
-index 3ff34bf..7d94fad 100644
+index 3ff34bf..a31dd64 100644
 --- a/README.md
 +++ b/README.md
-@@ -977,6 +977,15 @@ This is an application-alive reinstall path. If the temple no longer answers
+@@ -977,6 +977,16 @@ This is an application-alive reinstall path. If the temple no longer answers
  the version preflight, do not attempt it repeatedly: use a separately proven
  SBL/MRAM-recovery or SWD route.
  
-+The local Thai G2 2.3.2.14 build is a narrow exception to the official-bundle
++The local Thai G2 2.3.2.14 build uses native-resolution Maitree ExtraLight
++with contextual Thai vowels and tones. It is a narrow exception to the official-bundle
 +rule. The browser accepts only its exact whole-bundle SHA-256 and Apollo-main
 +SHA-256 through the Case USB writer; it cannot stage the Case component and is
 +blocked from Bluetooth transfer. Its Case-USB transfer is hash-pinned but has
@@ -139,7 +140,7 @@ index 930b49b..7a95cf4 100644
      throw new Error(
 diff --git a/src/lib/localTempleFlashTargets.js b/src/lib/localTempleFlashTargets.js
 new file mode 100644
-index 0000000..09f03b2
+index 0000000..ab73418
 --- /dev/null
 +++ b/src/lib/localTempleFlashTargets.js
 @@ -0,0 +1,37 @@
@@ -149,17 +150,17 @@ index 0000000..09f03b2
 +
 +export const LOCAL_G2_TEMPLE_FLASH_TARGETS = Object.freeze([
 +  Object.freeze({
-+    imageSha256: "e6e1f569d1f50e64690cd546fbba400eed6067e0dc674d5fd3c00a1dabe5f609",
-+    mainSha256: "e5cee9c797ed43ca9528926e38113485838a013ecd446df731e71a71f97a8625",
-+    mainBytes: 3951463,
++    imageSha256: "b5ca374b1a0223b8127db9eea30a095b4b42041cc0bb5fdb9d175982ac190dff",
++    mainSha256: "67f41441727d84102020ab4288e6f840c08b124ca80eaff73197137beb3843c7",
++    mainBytes: 3956364,
 +    version: "2.3.2.14",
 +    reportedVersion: "2.3.2.14",
-+    label: "Thai G2 2.3.2.14 · 2005_iannnnnAMD · local Case USB only",
++    label: "Thai G2 2.3.2.14 · Maitree ExtraLight · local Case USB only",
 +    hardwareValidated: false,
 +    localOnly: true,
 +    baseVersion: "2.3.2.14",
 +    capabilities: [
-+      "Uses the stock G2 2.3.2.14 container with a Thai SARA AM tone-mark positioning patch.",
++      "Uses the stock G2 2.3.2.14 container with the native-resolution Maitree ExtraLight font with Thai SARA AM and contextual vowel/tone positioning.",
 +      "Accepted only through the charging-case USB writer; direct Bluetooth update remains blocked.",
 +      "Hash-pinned and structurally verified, but not yet validated by a Case-USB hardware transfer.",
 +    ],

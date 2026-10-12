@@ -51,8 +51,11 @@ bool thai_font_get_glyph_dsc(const uint32_t *font, void *glyph_dsc,
         "beq 2f\n"
         "movw r12, #0xf700\n"
         "eor.w r12, r12, r2\n"
-        "cmp r12, #4\n"
+        "cmp r12, #51\n"
         "blo 2f\n"
+        "lsr.w r12, r2, #12\n"
+        "cmp r12, #0xf0\n"
+        "beq 2f\n"
         "b.w stock_font_get_glyph_dsc\n"
         "2: b.w thai_lookup_covered\n");
 }

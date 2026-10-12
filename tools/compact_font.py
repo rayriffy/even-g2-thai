@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Half-resolution A2 storage; retain full-size glyph metrics and four alphas."""
+"""Host font reader; legacy A2 conversion is retained for before/after evidence."""
 from __future__ import annotations
 
 import argparse
@@ -8,13 +8,20 @@ from pathlib import Path
 import struct
 
 from font_blob import HEADER, RECORD, SIZE_RECORD, THAI_COUNT, UPPER_MARKS
+from pixel_codec import decode_rows, decode_native_bitmap
+from maitree_shaping import ALIASES, NATIVE
+from native_font_record import unpack_record
 
 COMPACT_RECORD = struct.Struct("<HHBBbb")
 COMPACT_VERSION = 3
 
 
-def decode_pixels(blob: bytes, record: tuple[int, ...]) -> bytes:
+def decode_pixels(blob: bytes, record: tuple[int, ...], version: int = COMPACT_VERSION) -> bytes:
     offset, _, width, height, _, _ = record
+    if version == 4:
+        return decode_rows(blob, offset, width, height)
+    if version == 5:
+        return decode_native_bitmap(blob, offset, width, height)
     samples_w, samples_h = (width + 1) // 2, (height + 1) // 2
     count = samples_w * samples_h
     if offset + (count + 3) // 4 > len(blob):
@@ -30,27 +37,33 @@ def expand_blob(blob: bytes) -> bytes:
     magic, version, sizes, glyphs, record_size, offset = HEADER.unpack_from(blob)
     if version == 2:
         return blob
-    if version != COMPACT_VERSION or record_size != COMPACT_RECORD.size:
+    if version not in (COMPACT_VERSION, 4, 5) or record_size != (6 if version == 5 else COMPACT_RECORD.size):
         raise ValueError("unsupported compact font format")
     result = bytearray(blob[:offset])
-    HEADER.pack_into(result, 0, magic, 2, sizes, glyphs, RECORD.size, offset)
-    result.extend(bytes(sizes * glyphs * RECORD.size))
+    expanded_count = THAI_COUNT + len(ALIASES) if version == 5 else glyphs
+    HEADER.pack_into(result, 0, magic, 2, sizes, expanded_count, RECORD.size, offset)
+    result.extend(bytes(sizes * expanded_count * RECORD.size))
     seen = {}
     for index in range(sizes * glyphs):
-        record = COMPACT_RECORD.unpack_from(blob, offset + index * record_size)
+        record = (unpack_record(blob, offset + index * record_size) if version == 5
+                  else COMPACT_RECORD.unpack_from(blob, offset + index * record_size))
         source, advance, width, height, x, y = record
         if not width:
             continue
         row_bytes = (width + 1) // 2
         if source not in seen:
             seen[source] = len(result)
-            pixels = decode_pixels(blob, record)
+            pixels = decode_pixels(blob, record, version)
             for row in range(height):
                 for column in range(0, width, 2):
                     first = pixels[row * width + column] // 17
                     second = pixels[row * width + column + 1] // 17 if column + 1 < width else 0
                     result.append((first << 4) | second)
-        RECORD.pack_into(result, offset + index * RECORD.size,
+        size_index, glyph_index = divmod(index, glyphs)
+        if version == 5:
+            glyph_index = NATIVE[glyph_index] - 0x0E00 if glyph_index < len(NATIVE) else THAI_COUNT + glyph_index - len(NATIVE)
+        output_index = size_index * expanded_count + glyph_index
+        RECORD.pack_into(result, offset + output_index * RECORD.size,
                          seen[source], advance, width, height, x, y, row_bytes, 1)
     return bytes(result)
 

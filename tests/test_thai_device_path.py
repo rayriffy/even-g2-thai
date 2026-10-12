@@ -21,6 +21,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from compact_font import COMPACT_RECORD, expand_blob
+from pixel_codec import encode_bitmap
+from native_font_record import glyph_record as compact_glyph_record
+from maitree_shaping import shape_for_preview, ALT_COUNT, TAG_START, TAG_END, untag, adjustment, rounded_units
+from render_preview import glyph_index
 ARTIFACT = ROOT / "build" / "g2_2.3.2.14_thai.bin"
 SPEC = ROOT / "patches" / "thai_patches.json"
 
@@ -249,15 +253,15 @@ class ThaiDevicePathTests(unittest.TestCase):
         # U+0E19 followed by U+0E49: no remap on the first pair.
         self.assertEqual(self.decode_step(text, 0), [0x0E19, 0x0E49, 3])
         # The tone mark before SARA AM must surface as its raised PUA form.
-        self.assertEqual(self.decode_step(text, 3), [ALT_START + 1, 0x0E33, 6])
+        self.assertEqual(self.decode_step(text, 3), [shape_for_preview("น้ำ")[1], 0x0E33, 6])
         # End of string: the decoder reports no letter and leaves the offset.
         self.assertEqual(self.decode_step(text, 9), [0, 0, 9])
 
     def test_tone_after_upper_vowel_maps_to_alternate(self) -> None:
         text = self.utf8("นี้")
         self.assertEqual(self.decode_step(text, 0), [0x0E19, 0x0E35, 3])
-        self.assertEqual(self.decode_step(text, 3), [0x0E35, 0x0E49, 6])
-        self.assertEqual(self.decode_step(text, 6), [ALT_START + 1, 0, 9])
+        self.assertEqual(self.decode_step(text, 3), [shape_for_preview("นี้")[1], 0x0E49, 6])
+        self.assertEqual(self.decode_step(text, 6), [shape_for_preview("นี้")[2], 0, 9])
 
     def test_plain_tone_mark_without_sara_am_is_untouched(self) -> None:
         text = self.utf8("เก่ง")
@@ -278,8 +282,9 @@ class ThaiDevicePathTests(unittest.TestCase):
     def test_every_glyph_rasterizes_within_bounds(self) -> None:
         fonts = self.font_arrays()
         for size, layout in sorted(fonts.items()):
-            for codepoint in range(THAI_START, THAI_START + 0x80):
+            for codepoint in [*range(THAI_START, THAI_START + 0x80), *range(ALT_START, ALT_START + ALT_COUNT)]:
                 with self.subTest(size=size, codepoint=hex(codepoint)):
+                    saved_ram_next = self.ram_next
                     dsc_buffer = self.alloc(64)
                     status = self.call(
                         layout["dsc"],
@@ -296,7 +301,7 @@ class ThaiDevicePathTests(unittest.TestCase):
                     self.assertEqual(size_count, 8)
                     font_index = sorted(fonts).index(size)
                     record_offset = records_offset + (
-                        font_index * glyph_count + codepoint - THAI_START
+                        font_index * glyph_count + glyph_index(codepoint)
                     ) * 12
                     bitmap_offset, _, _, _, _, _, row_bytes, _ = struct.unpack_from(
                         "<IHBBbbBB", self.font_blob, record_offset
@@ -337,18 +342,52 @@ class ThaiDevicePathTests(unittest.TestCase):
                                 sentinel,
                                 f"size {size} codepoint {codepoint:#06x} overran its bitmap buffer",
                             )
+                    self.ram_next = saved_ram_next
 
-    def test_runtime_cache_hit_survives_erased_a4_source(self) -> None:
+    def test_context_decoder_keeps_utf8_offsets_and_matches_all_reference_cases(self):
+        reference = json.loads((ROOT / 'fonts/maitree/shaping-reference.json').read_text())
+        for cases in reference['cases'].values():
+            for text in cases:
+                saved = self.ram_next
+                address = self.utf8(text)
+                raw = [ord(c) for c in text]
+                expected = shape_for_preview(text)
+                for i, cp in enumerate(expected):
+                    following = raw[i + 1] if i + 1 < len(raw) else 0
+                    self.assertEqual(self.decode_step(address, i * 3), [cp, following, (i + 1) * 3], text)
+                self.assertEqual(bytes(self.uc.mem_read(address, len(text.encode()))), text.encode())
+                self.ram_next = saved
+
+    def test_context_tags_have_exact_metrics_and_pixels_in_final_firmware(self):
+        reference = json.loads((ROOT / 'fonts/maitree/shaping-reference.json').read_text())
+        tags = {cp for cases in reference['cases'].values() for text in cases
+                for cp in shape_for_preview(text) if TAG_START <= cp < TAG_END}
+        for size, layout in self.font_arrays().items():
+            ix = (16, 20, 24, 28, 32, 36, 40, 48).index(size)
+            for cp in tags:
+                saved = self.ram_next
+                canonical = untag(cp)
+                _, advance, width, height, left, y = compact_glyph_record(self.compact_blob, ix, canonical)
+                dsc = self.alloc(32)
+                self.assertEqual(self.call(layout['dsc'], [layout['address'], dsc, cp, 0]), 1)
+                dx, dy = adjustment(cp)
+                expected = (advance, width, height, left + rounded_units(dx, size), y + rounded_units(dy, size))
+                actual = struct.unpack('<HHHhh', self.uc.mem_read(dsc + 4, 10))
+                self.assertEqual(actual, expected, (size, hex(cp)))
+                self.assertEqual(self.render_glyph(layout, layout['address'], cp),
+                                 self.render_glyph(layout, layout['address'], canonical))
+                self.ram_next = saved
+
+    def test_runtime_cache_hit_survives_erased_bitmap_source(self) -> None:
         layout = self.font_arrays()[28]
         runtime, _slot_bytes = self.runtime_font(layout)
         codepoint = 0x0E01
         first = self.render_glyph(layout, runtime, codepoint)
         self.assertTrue(any(first))
-        bitmap_offset, _, box_w, box_h, _, _ = COMPACT_RECORD.unpack_from(
-            self.compact_blob, 80 + (3 * 132 + codepoint - THAI_START) * 8)
+        bitmap_offset, _, box_w, box_h, _, _ = compact_glyph_record(self.compact_blob, 3, codepoint)
         self.uc.mem_write(
             self.font_blob_address + bitmap_offset,
-            bytes(((box_w + 1) // 2 * ((box_h + 1) // 2) + 3) // 4),
+            encode_bitmap(bytes(box_w * box_h), box_w, box_h),
         )
         second = self.render_glyph(layout, runtime, codepoint)
         self.assertEqual(second, first)

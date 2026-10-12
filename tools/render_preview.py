@@ -10,6 +10,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 from compact_font import expand_blob
+from maitree_shaping import ALT_COUNT, adjustment, rounded_units, untag, shape_for_preview
 
 from font_blob import (
     ALT_START,
@@ -26,43 +27,39 @@ UPPER_MARKS = frozenset([0x0E31, *range(0x0E34, 0x0E38), 0x0E47, 0x0E4C, 0x0E4D,
 
 
 def glyph_index(codepoint: int) -> int | None:
+    if 0xF0000 <= codepoint < 0xF1000:
+        codepoint = untag(codepoint)
     if THAI_START <= codepoint < THAI_START + THAI_COUNT:
         return codepoint - THAI_START
-    if ALT_START <= codepoint < ALT_START + 4:
+    if ALT_START <= codepoint < ALT_START + ALT_COUNT:
         return THAI_COUNT + codepoint - ALT_START
     return None
 
 
-def shape_for_preview(text: str) -> list[int]:
-    codepoints = [ord(char) for char in text]
-    for index in range(len(codepoints)):
-        current = codepoints[index]
-        following = codepoints[index + 1] if index + 1 < len(codepoints) else 0
-        previous = codepoints[index - 1] if index else 0
-        if (
-            0x0E48 <= current <= 0x0E4B
-            and (following == 0x0E33 or previous in UPPER_MARKS)
-        ):
-            codepoints[index] = ALT_START + current - 0x0E48
-    return codepoints
+def legacy_shape(text):
+    raw = [ord(c) for c in text]
+    return [ALT_START + cp - 0x0E48 if 0x0E48 <= cp <= 0x0E4B and
+            ((i + 1 < len(raw) and raw[i + 1] == 0x0E33) or (i and raw[i - 1] in UPPER_MARKS))
+            else cp for i, cp in enumerate(raw)]
 
 
-def render(blob: bytes, size_index: int = 3) -> Image.Image:
+def render(blob: bytes, size_index: int = 3, samples=SAMPLES, width=360) -> Image.Image:
+    source_header = HEADER.unpack_from(blob)
+    native = source_header[1] == 5 or source_header[3] == THAI_COUNT + ALT_COUNT
     blob = expand_blob(blob)
     _, _, size_count, glyph_count, _, records_offset = HEADER.unpack_from(blob)
     if not 0 <= size_index < size_count:
         raise ValueError("font size index out of range")
-    _, line_height, base_line, _ = SIZE_RECORD.unpack_from(
+    target_size, line_height, base_line, _ = SIZE_RECORD.unpack_from(
         blob, HEADER.size + size_index * SIZE_RECORD.size
     )
 
-    width = 360
     margin = 12
-    image = Image.new("L", (width, margin * 2 + line_height * len(SAMPLES)), 0)
-    for row_index, text in enumerate(SAMPLES):
+    image = Image.new("L", (width, margin * 2 + line_height * len(samples)), 0)
+    for row_index, text in enumerate(samples):
         pen_x = margin
         line_top = margin + row_index * line_height
-        for codepoint in shape_for_preview(text):
+        for codepoint in (shape_for_preview(text) if native else legacy_shape(text)):
             index = glyph_index(codepoint)
             if index is None or index >= glyph_count:
                 pen_x += line_height // 2
@@ -74,6 +71,9 @@ def render(blob: bytes, size_index: int = 3) -> Image.Image:
             )
             bitmap_offset, advance, box_w, box_h, ofs_x, ofs_y, row_bytes, present = record
             if present:
+                dx, dy = adjustment(codepoint)
+                ofs_x += rounded_units(dx, target_size)
+                ofs_y += rounded_units(dy, target_size)
                 y1 = line_top + (line_height - base_line) - box_h - ofs_y
                 for y in range(box_h):
                     source = bitmap_offset + y * row_bytes

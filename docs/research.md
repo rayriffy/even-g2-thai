@@ -2,6 +2,10 @@
 
 Current target: **2.3.2.14**. Its complete address map, provenance, decoder
 dispatch and validation record are in [the current rebase evidence](rebases/2.3.2.14.md).
+The current font is [Maitree ExtraLight](thai-pixel-font.md), using native A1
+rasters and font-specific contextual attachments. The initial A2 sampling and
+AMD erosion described below are superseded.
+
 The sections below retain the 2.2.9.22 research and crash history; their numeric
 addresses describe that historical image, not the current patch.
 
@@ -177,5 +181,5 @@ the version-authenticated OTA boundary `0x007FE000`. Stock 2.3.2.14 already
 ends at `0x007F5AAC`, above the former `0x007F0000` estimate. Its code loads
 the OTA flag at `0x007FE000` and programs the MRAM settings page at
 `0x007FF000`; the [current disassembly](rebases/2.3.2.14-integrity.asm)
-records those references. The compact candidate leaves 5,305 bytes before
+records those references. The current Maitree candidate leaves 404 bytes before
 the OTA flag. This limit is specific to the authenticated version.

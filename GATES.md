@@ -1,23 +1,27 @@
-# Gates: G2 Thai 2.3.2.14 rebase
+# Gates: Maitree ExtraLight Thai font for G2 2.3.2.14
 
-OWNS: build_thai.sh, patches/thai*, tools/*, tests/*, docs/*, README.md, GATES.md, patches/webflasher_case_usb_thai.patch, third_party/evenRealities-webflasher/src/lib/localTempleFlashTargets.js, third_party/evenRealities-webflasher/tests/firmware.test.mjs, third_party/evenRealities-webflasher/README.md
+OWNS: fonts/**, build_thai.sh, patches/thai*, tools/*, tests/*, docs/*, README.md, GATES.md, patches/webflasher_case_usb_thai.patch, third_party/evenRealities-webflasher/src/lib/localTempleFlashTargets.js, third_party/evenRealities-webflasher/tests/firmware.test.mjs, third_party/evenRealities-webflasher/README.md
 
-Scope: authenticate stock 2.3.2.14, relocate the Thai patch, fit its install window using user-approved smaller bitmaps while retaining all Thai characters and eight sizes, and preserve Case-USB acceptance with same-version rollback.
+Scope: research stock text rendering, replace the rejected redraw with native-resolution Maitree ExtraLight rasters and contextual Thai shaping, retain all characters/eight sizes and Thai mark shaping, fit the authenticated firmware boundary, and produce a locally verified Case-USB candidate.
 
-- [x] G1: Stock provenance, exact hooks, decoder dispatch and install boundary have binary evidence
-  EVIDENCE: Independently authenticated official OTA and all six components; unique version-specific anchors, decoded final branches, exactly two builder callers, double-indirect decoder verified. SHA-pinned disassembly authenticates OTA 0x7FE000 and settings 0x7FF000. Pinned G2Flash validates both images with the scoped authenticated ceiling override; source repository unchanged.
+- [x] G1: Stock font research and photo/code diagnosis distinguish confirmed facts from unavailable native assets
+  EVIDENCE: docs/thai-pixel-font.md and authenticated native-font listing establish outline/preloaded paths; missing XIP banks and photo defocus limits explicitly retained.
 - [x] G2: Rebuilt firmware passes all regression and emulation checks
   CHECK: rtk proxy env PATH=/Users/rayriffy/Git/g2-thai/.venv/bin:/usr/bin:/bin:/usr/sbin:/sbin make check
-  EXPECT: OK
-  EVIDENCE: automatic-evidence=v1; definition-sha256=4af54b6b8371bfcd8db0b2e6e4c6e4449585f7ba221e5807d3354c97926bab20; exit=0; EXPECT=matched; output-sha256=271ebb8967f30e2cec52f3e32b27f019be0312a1eff928448ebcb37b53084d49; output-bytes=9443; shell=/bin/sh; cwd=/Users/rayriffy/Git/g2-thai; path=a97ba71f236f/22 entries
-- [x] G3: Compact storage retains every Thai character and eight metric sets, with visible marks and bounded expansion
-  EVIDENCE: 64 firmware tests pass, including compact reproduction and every significant source stroke, all eight coverage/metric sets, SARA AM dot and contextual-mark separation, native fallback/register controls, all-glyph bitmap expansion with odd/unaligned strides, and cache ownership. Preview visually checked; 24,147-byte A2 font and 4,680-byte code end at 0x7FCB47, leaving 5,305 bytes before the flag. No extra bitmap allocation.
-- [x] G4: WebFlasher exact pins accept the candidate and rollback and reject mutations
+  EXPECT: /^OK$/m
+  EVIDENCE: automatic-evidence=v1; definition-sha256=bc67684ade4284fc7d080008250d765e721b99d555f9275280c36d132193ff87; exit=0; EXPECT=matched; output-sha256=e0ae90380256a25f022f65d763fb13ac31f2da5e3b6039f2040e8265ff4a6817; output-bytes=11368; shell=/bin/sh; cwd=/Users/rayriffy/Git/g2-thai; path=a97ba71f236f/22 entries
+- [x] G3: Maitree font retains every Thai character/eight sizes, native font forms, shared baseline and attached vowels; tall and descending consonants, stacked tones and SARA AM covered
+  EVIDENCE: Direct unmodified Maitree ExtraLight TTF body/baseline identity at eight grids; all87 characters retained; 1936 HarfBuzz selections/rounded attachments match across8 sizes; all44-consonant vowel/tone/line-box checks pass.
+- [x] G4: WebFlasher exact pins accept the new candidate and rollback and reject mutations
   CHECK: rtk proxy /Users/rayriffy/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node tools/check_webflasher_artifacts.mjs
   EXPECT: WEBFLASHER_ARTIFACTS_OK
   EVIDENCE: automatic-evidence=v1; definition-sha256=23c940328866e8961b6beb911d5d025f956204c95828660b43dba90ed0a060c3; exit=0; EXPECT=matched; output-sha256=92cf440f4f0a923db1fdc264ae3fe456e3253bfaca614e744db897476de42980; output-bytes=180; shell=/bin/sh; cwd=/Users/rayriffy/Git/g2-thai; path=a97ba71f236f/22 entries
-- [x] G5: Companion tests/build, reproducibility, portable patch and review pass
-  EVIDENCE: 345 WebFlasher tests, 25 companion Python tests and production build pass. Fresh pinned-baseline patch application reproduces all 12 files and updated 2.3.2.14 README instructions. Source regeneration byte-matches thai_patches.json; final artifact SHA-256 e6e1f569d1f50e64690cd546fbba400eed6067e0dc674d5fd3c00a1dabe5f609 agrees with record and writer pins. Final Codex/gpt-5.5 autoreview exited 0 with no actionable findings; result saved in build/g2-2.3.2.14-review-final.json. git diff --check clean.
+- [x] G5: Lossless full-resolution bitmap decoding is proven against known controls and final artifact execution
+  EVIDENCE: Exact round trips for1104 native/contextual glyph-size entries and isolated-pixel/odd-edge controls; final Thumb bitmap callbacks, tags, alignment, stride and cache paths pass emulation.
+- [x] G6: Source reproduction, container preservation, size limit, companion tests/build and portable patch pass
+  EVIDENCE: Pinned font source and HarfBuzz fixture reproduce; all5 non-main components unchanged, stock+candidate pass independent G2Flash validation, end7FDE6C below7FE000 by404 bytes;345 JS+25 Python tests and Vite build pass; portable patch applies across12 files with byte-identical output.
+- [x] G7: Typeface previews, documentation and independent change review pass
+  EVIDENCE: Source-vs-firmware comparison and full alphabet inspected; eight native-size previews generated; docs/OFL/source provenance current; autoreview --mode local --model codex=gpt-5.5 completed clean with zero findings (build/maitree-autoreview.json).
 
 Hardware boundary: no flashing requested. Actual frame rate, GPU timing, boot and rollback require physical validation; offline instruction counts do not establish FPS parity.
-Discovery: indexed symbol query `generate_patch` found tools/generate_patch.py. Exact current reads established the 2.3.0.24 baseline. Upstream metadata staged in /tmp, pinned to 2fcdb888facfe9c56672cbe2a3da741b44033c44. Binary-dispatched emulation coverage is checked explicitly too.
+Discovery: indexed `Maitree` search was empty; indexed decoder search located patches/thai_font.c. Native source and font inspection used for the new input. The existing A2 codec downsamples then replicates samples 2x2; the redesign must remove that loss. No device writes are part of this request. The user approved the Maitree candidate and authorized commit/push on 2026-10-12.

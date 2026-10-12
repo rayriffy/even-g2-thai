@@ -11,10 +11,14 @@ import subprocess
 import sys
 import zlib
 from pathlib import Path
+from pixel_codec import decode_native_bitmap
+from native_font_record import unpack_record, RECORD_SIZE
+from maitree_shaping import GLYPH_COUNT
 
 STOCK_SHA256 = "26b6067665a441b779c47f6b95427b8b4bb5f502aaf527466dadce628aeb00b2"
-FONT_SHA256 = "688f2ef20776a1f0286bd73bef4dd5d5c76640f4a7c4f0ea5f7c1b8d87a969b7"
-FONT_SOURCE_COMMIT = "vendored:third_party/2005_iannnnnAMD.ttf"
+FONT_SOURCE = Path(__file__).resolve().parents[1] / "fonts/maitree/Maitree-ExtraLight.ttf"
+FONT_SHA256 = hashlib.sha256(FONT_SOURCE.read_bytes()).hexdigest()
+FONT_SOURCE_COMMIT = "google/fonts:bd8f81ddb5c74d5c8897b36ad88b440266245103"
 MAINAPP_SUFFIX = "ota/s200_firmware_ota.bin"
 APP_LOAD_ADDR = 0x00438000
 APP_PREAMBLE = 0x20
@@ -150,8 +154,28 @@ def replace_words(blob: bytearray, old: int, new: int, expected: int) -> None:
 def build_spec(stock: bytes, font_blob: bytes, build: dict[str, object]) -> dict[str, object]:
     if hashlib.sha256(stock).hexdigest() != STOCK_SHA256:
         raise ValueError("stock firmware SHA-256 mismatch")
-    if struct.unpack_from("<IHHHHI", font_blob) != (0x49414854, 3, 8, 132, 8, 80):
-        raise ValueError("expected compact A2 font format and eight metric sets")
+    if struct.unpack_from("<IHHHHI", font_blob) != (0x49414854, 5, 8, GLYPH_COUNT, RECORD_SIZE, 80):
+        raise ValueError("expected full-resolution A1 pixel font and eight metric sets")
+    records_end = 80 + 8 * GLYPH_COUNT * RECORD_SIZE
+    if len(font_blob) < records_end:
+        raise ValueError("incomplete pixel font metric tables")
+    palette_offset = struct.unpack_from("<H", font_blob, 22)[0]
+    if palette_offset != records_end or palette_offset + 2 > len(font_blob):
+        raise ValueError("invalid pixel font palette position")
+    palette_count = struct.unpack_from("<H", font_blob, palette_offset)[0]
+    bitmap_start = palette_offset + 2 + palette_count
+    if not 1 <= palette_count <= 256 or bitmap_start > len(font_blob):
+        raise ValueError("invalid pixel font palette size")
+    for size_index in range(8):
+        if struct.unpack_from("<H", font_blob, 22 + size_index * 8)[0] != palette_offset:
+            raise ValueError("pixel font palette metadata mismatch")
+    for index in range(8 * GLYPH_COUNT):
+        offset, _, width, height, _, _ = unpack_record(font_blob, 80 + index * RECORD_SIZE)
+        if not width:
+            continue
+        if not height or offset < bitmap_start:
+            raise ValueError("invalid pixel font bitmap record")
+        decode_native_bitmap(font_blob, offset, width, height)
     malloc_address, malloc_expected = LV_MALLOC_SITE
     malloc_offset = malloc_address - G2_FILE_DELTA
     malloc_actual = bytes(stock[malloc_offset : malloc_offset + len(malloc_expected)])
@@ -280,7 +304,8 @@ def build_spec(stock: bytes, font_blob: bytes, build: dict[str, object]) -> dict
             "code_bytes": len(code),
             "font_blob_offset_in_append": font_offset - old_size,
             "font_blob_bytes": len(font_blob),
-            "font_storage": "half-resolution A2; eight full-size metric sets",
+            "font_storage": "full-resolution A1; lossless row/tile storage; eight sizes",
+            "font_family": "Maitree ExtraLight 200",
             "font_blob_sha256": hashlib.sha256(font_blob).hexdigest(),
             "font_source_sha256": FONT_SHA256,
             "font_source_commit": FONT_SOURCE_COMMIT,
