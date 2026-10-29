@@ -200,9 +200,9 @@ class ThaiPatchTests(unittest.TestCase):
     def test_patch_has_two_font_chain_hooks(self) -> None:
         hooks = [item for item in self.spec["patches"] if item["desc"].startswith("font chain")]
         self.assertEqual(len(hooks), 2)
-        self.assertEqual({item["old"] for item in hooks}, {"fff736fb", "fff707fb"})
+        self.assertEqual({item["old"] for item in hooks}, {"fff774fb", "fff745fb"})
         self.assertEqual(
-            self.spec["metadata"]["hook_sites"], ["0x00471BC8", "0x00471C26"]
+            self.spec["metadata"]["hook_sites"], ["0x00476204", "0x00476262"]
         )
         target = int(self.spec["metadata"]["chain_wrapper_address"], 16)
         for hook, address_text in zip(hooks, self.spec["metadata"]["hook_sites"]):
@@ -217,7 +217,7 @@ class ThaiPatchTests(unittest.TestCase):
         )
         self.assertEqual(hook["old"], "2de9f041")
         site = int(self.spec["metadata"]["text_helper_hook_site"], 16)
-        self.assertEqual(site, 0x00493FC0)
+        self.assertEqual(site, 0x0049F1E4)
         target = int(self.spec["metadata"]["text_helper_wrapper_address"], 16)
         self.assertEqual(bytes.fromhex(hook["new"]), encode_bw(site, target))
 
@@ -230,9 +230,9 @@ class ThaiPatchTests(unittest.TestCase):
         self.assertIn("#define GLYPH_DSC_SIZE 32u", source)
         self.assertIn("#define GLYPH_DSC_FORMAT_OFFSET 14u", source)
         self.assertIn("#define GLYPH_DSC_GID_OFFSET 24u", source)
-        self.assertIn("#define STOCK_CHAIN_BUILD_THUMB 0x00471239u", source)
-        self.assertIn("#define STOCK_DECODE_SLOT_INDIRECT 0x00494330u", source)
-        self.assertIn("#define LV_MALLOC_THUMB 0x0047EC6Bu", source)
+        self.assertIn("#define STOCK_CHAIN_BUILD_THUMB 0x004758F1u", source)
+        self.assertIn("#define STOCK_DECODE_SLOT_INDIRECT 0x0049F554u", source)
+        self.assertIn("#define LV_MALLOC_THUMB 0x00480877u", source)
         self.assertNotIn("STOCK_UTF8_NEXT_THUMB", source)
         self.assertIn("uint32_t *active_offset = offset ? offset : &local_offset;", source)
         self.assertIn("next = decode(text + *active_offset, 0);", source)
@@ -242,8 +242,8 @@ class ThaiPatchTests(unittest.TestCase):
         self.assertIn("static int cache_restore(", source)
         self.assertIn("static void cache_store(", source)
         self.assertIn("return runtime->font;", source)
-        self.assertEqual(self.spec["metadata"]["lv_malloc_address"], "0x0047EC6A")
-        self.assertEqual(LV_MALLOC_SITE[0], 0x0047EC6A)
+        self.assertEqual(self.spec["metadata"]["lv_malloc_address"], "0x00480876")
+        self.assertEqual(LV_MALLOC_SITE[0], 0x00480876)
 
     def test_chain_append_only_writes_writable_ram(self) -> None:
         source = (ROOT / "patches/thai_font.c").read_text()
@@ -276,13 +276,13 @@ class ThaiPatchTests(unittest.TestCase):
         self.assertIn("sed '/^?? \\.DS_Store$/d'", source)
 
     def test_apply_and_verify_when_stock_is_cached(self) -> None:
-        self.assertEqual(self.spec["base"], "g2_2.3.2.14.bin")
+        self.assertEqual(self.spec["base"], "g2_2.4.0.24.bin")
         self.assertEqual(
             self.spec["base_sha256"],
-            "26b6067665a441b779c47f6b95427b8b4bb5f502aaf527466dadce628aeb00b2",
+            "363198f8d543a5c1181d8a213e9077285cb865700a1885c8dc7c1b9324fd0e05",
         )
-        self.assertEqual(self.spec["metadata"]["target"], "Even Realities G2 2.3.2.14")
-        stock_path = ROOT / ".cache/g2_2.3.2.14.bin"
+        self.assertEqual(self.spec["metadata"]["target"], "Even Realities G2 2.4.0.24")
+        stock_path = ROOT / ".cache/g2_2.4.0.24.bin"
         if not stock_path.exists():
             self.skipTest("stock firmware cache absent")
         output = apply_spec(stock_path.read_bytes(), self.spec)

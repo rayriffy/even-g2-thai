@@ -1,7 +1,7 @@
 ---
 read_when:
   - Changing the Thai font, bitmap storage or mark attachments
-  - Reviewing Thai legibility or สระลอย on firmware 2.3.2.14
+  - Reviewing Thai legibility or สระลอย on firmware 2.4.0.24
 ---
 
 # Maitree ExtraLight for G2
@@ -89,7 +89,7 @@ UTF-8 bytes, offsets and raw lookahead values.
 
 ## Stock rendering evidence
 
-The exact SHA-pinned [stock listing](rebases/2.3.2.14-native-font.asm) shows
+The historical 2.3.2.14 SHA-pinned [stock listing](rebases/2.3.2.14-native-font.asm) shows
 configuration dispatch at `0x004716FE`. Type 0 returns preloaded font objects.
 Type 1 passes a name, mode 1, size and style to `0x004C2DA8`. That call layout
 matches LVGL 9.3's
@@ -97,7 +97,9 @@ matches LVGL 9.3's
 whose enum defines mode 1 as outline rendering. Firmware strings also identify
 FreeType and Ambiq vector-font paths.
 
-The six-component OTA does not contain the external font banks. Their exact
+The [2.4.0.24 rebase](rebases/2.4.0.24.md) authenticates the current
+font-chain and descriptor integration separately. The six-component OTA
+does not contain the external font banks. Their exact
 Latin/Japanese families, weights and hinting flags cannot be established from
 this image. The patch retains their native callbacks. FreeType's
 [grid-fitting guidance](https://freetype.org/freetype2/docs/glyphs/glyphs-3.html)

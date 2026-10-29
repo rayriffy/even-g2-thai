@@ -1,7 +1,7 @@
 # Thai rendering patch research
 
-Current target: **2.3.2.14**. Its complete address map, provenance, decoder
-dispatch and validation record are in [the current rebase evidence](rebases/2.3.2.14.md).
+Current target: **2.4.0.24**. Its complete address map, provenance, decoder
+dispatch and validation record are in [the current rebase evidence](rebases/2.4.0.24.md).
 The current font is [Maitree ExtraLight](thai-pixel-font.md), using native A1
 rasters and font-specific contextual attachments. The initial A2 sampling and
 AMD erosion described below are superseded.
@@ -177,9 +177,9 @@ rendering.
 Injected code and font data are appended after the stock main-app payload. The
 patcher updates the main-app subheader size, TOC size, low-24-bit preamble
 length, preamble zlib CRC-32, and component CRC-32C. It refuses output beyond
-the version-authenticated OTA boundary `0x007FE000`. Stock 2.3.2.14 already
-ends at `0x007F5AAC`, above the former `0x007F0000` estimate. Its code loads
-the OTA flag at `0x007FE000` and programs the MRAM settings page at
-`0x007FF000`; the [current disassembly](rebases/2.3.2.14-integrity.asm)
-records those references. The current Maitree candidate leaves 404 bytes before
+the version-authenticated OTA boundary `0x007FE000`. Stock 2.4.0.24
+ends at `0x007BF564`. Its code loads the OTA flag at `0x007FE000` and programs
+the MRAM settings page at `0x007FF000`; the
+[current disassembly](rebases/2.4.0.24-integrity.asm) records those references.
+The current Maitree candidate ends at `0x007C7924`, leaving 222,940 bytes before
 the OTA flag. This limit is specific to the authenticated version.

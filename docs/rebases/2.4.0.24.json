@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "font_storage": "Maitree ExtraLight; full-resolution A1 with lossless row/tile storage",
+  "font_family": "Maitree ExtraLight (Google Fonts CSS weight 200)",
+  "font_source_sha256": "aaa310f9bc913882863b1d39bd70978b7d068ac831ef3789bd921f781392343d",
+  "font_bytes": 27304,
+  "target_version": "2.4.0.24",
+  "stock_sha256": "363198f8d543a5c1181d8a213e9077285cb865700a1885c8dc7c1b9324fd0e05",
+  "stock_url": "https://cdn-az.evenrealities.com/firmware/a0d486afe862a9121657477b98667c95.bin",
+  "stock_mirrors": [
+    "https://cdn.evenreal.co/firmware/a0d486afe862a9121657477b98667c95.bin",
+    "https://cdn-az.even-realities.com/firmware/a0d486afe862a9121657477b98667c95.bin"
+  ],
+  "stock_size": 4482361,
+  "stock_md5": "a0d486afe862a9121657477b98667c95",
+  "provenance": "User-supplied DeviceOtaInfo metadata; primary CDN and cdn.evenreal.co downloads byte-identical. No 2.4.0.24 entry in upstream catalog at 2fcdb888facfe9c56672cbe2a3da741b44033c44.",
+  "patched_sha256": "2a4fa5c109f772febbe777fc137e5b86352cfa6333903277479053db97080735",
+  "patched_size": 4516089,
+  "patched_main_sha256": "b2d3bd99c997a0a8c21917aecbddba15d10b4c0c4b652d6e9ee0a7fa7045e86b",
+  "patched_main_size": 3733828,
+  "component_count": 6,
+  "hardware_validated": false,
+  "file_delta": "0x0037902B",
+  "payload_file_offset": 782261,
+  "decoder_dispatch": {
+    "literal": "0x0049F554",
+    "storage": "0x007B9ED0",
+    "thumb_entry": "0x0049F307"
+  },
+  "stock_components": [
+    {
+      "name": "firmware/codec.bin",
+      "typeId": 4,
+      "size": 329092,
+      "crc32c": "29390051",
+      "sha256": "a85dd9988c13b8e113b9882caa901b5d0eb038769dd4042a3a435e852436413e"
+    },
+    {
+      "name": "firmware/ble_em9305.bin",
+      "typeId": 5,
+      "size": 211948,
+      "crc32c": "c074baf7",
+      "sha256": "91a38f7fc05555f86181ecb22b363e3239bfcaaa2ff6171e98524ae64821eca9"
+    },
+    {
+      "name": "firmware/touch.bin",
+      "typeId": 3,
+      "size": 34720,
+      "crc32c": "903ca49a",
+      "sha256": "c14456cd4d432815d79700b251c9a575f75c76a3710f4148c0df6ddba4cb7ba2"
+    },
+    {
+      "name": "firmware/box.bin",
+      "typeId": 6,
+      "size": 55784,
+      "crc32c": "7d443be0",
+      "sha256": "36ca0c13558f252af286ae2b36b5e576d087d21d37b15d778e7da9f502a70374"
+    },
+    {
+      "name": "ota/s200_bootloader.bin",
+      "typeId": 1,
+      "size": 149773,
+      "crc32c": "516caf63",
+      "sha256": "ecb91896234392e2b98ec80b1ac3ebf4aa27726d3cbed10927edf0b44d83d665"
+    },
+    {
+      "name": "ota/s200_firmware_ota.bin",
+      "typeId": 0,
+      "size": 3700100,
+      "crc32c": "c4b3b51a",
+      "sha256": "33f9eb7a47f996b8bcf34ac9df8bc2f7b698a6512cbf370d25b3215ad0dde298"
+    }
+  ],
+  "anchors": [
+    {
+      "role": "chain builder",
+      "old_address": "0x00471238",
+      "new_address": "0x004758F0",
+      "anchor_offset": 12,
+      "bytes": "80070dd5dff8e008019041200090dff8dc38dff8082adff8"
+    },
+    {
+      "role": "font call 1",
+      "old_address": "0x00471BC8",
+      "new_address": "0x00476204",
+      "anchor_offset": 0,
+      "bytes": "fff774fb20602068002805d02068fff7a8fd724908601fe0"
+    },
+    {
+      "role": "font call 2",
+      "old_address": "0x00471C26",
+      "new_address": "0x00476262",
+      "anchor_offset": 0,
+      "bytes": "fff745fb20602068002805d02068fff779fd604908601fe0"
+    },
+    {
+      "role": "letter pair helper",
+      "old_address": "0x00493FC0",
+      "new_address": "0x0049F1E4",
+      "anchor_offset": 0,
+      "bytes": "2de9f04105000e0014001f00dff8608339002800d8f80020904730603068002806d0002138682844d8f80020904700e000202060bde8f0810178090601d4012015e0017811f0e001c02901d102200ee0017811f0f001e02901d1032007e0007810f0f800f02801d1042000e00020704781b0802816d3b0f5006f15d201008909"
+    },
+    {
+      "role": "UTF-8 decoder",
+      "old_address": "0x004940E2",
+      "new_address": "0x0049F306",
+      "anchor_offset": 0,
+      "bytes": "81b0002200230093002900d16946002803d00b68c35c002b01d110009de00b68c35c1b0605d40a68825c0868401c086092e00b68c35c13f0e003c02b18d10a68835c13f01f039b010a68521c0a600a68825c12f0c002802a01d000207de00a68825c12f03f02d2180868401c086073e00b68c35c13f0f003e02b29d10a68835c"
+    },
+    {
+      "role": "glyph release",
+      "old_address": "0x004EB390",
+      "new_address": "0x00508AFC",
+      "anchor_offset": 32,
+      "bytes": "00205ff0ff310860fae7e869002814d02c68002c11d0a06800280ed0724ea069"
+    },
+    {
+      "role": "glyph descriptor",
+      "old_address": "0x004EB3EC",
+      "new_address": "0x00508B58",
+      "anchor_offset": 0,
+      "bytes": "2de9fe4f070091469846002f10d1624802906248019062480090674b5a226249"
+    },
+    {
+      "role": "allocator",
+      "old_address": "0x0047EC6A",
+      "new_address": "0x00480876",
+      "anchor_offset": 0,
+      "bytes": "70b504000025824e4ff47a713068c2f740fb002809d121007f48006874f062fe"
+    }
+  ],
+  "install_boundary": {
+    "stock_end": "0x007BF564",
+    "ota_flag": "0x007FE000",
+    "settings_page": "0x007FF000",
+    "safe_ceiling": "0x007FE000"
+  },
+  "programmed_end": "0x007C7924",
+  "headroom_bytes": 222940
+}

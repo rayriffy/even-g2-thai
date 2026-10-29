@@ -1,4 +1,4 @@
-/* Stock 2.3.2.14 lv_font_get_glyph_dsc entry is exactly one PUSH.W.
+/* Stock 2.4.0.24 lv_font_get_glyph_dsc entry is exactly one PUSH.W.
    Replay it, then resume at +4 without changing arguments or the return LR.
    The generator authenticates the complete entry anchor before hooking it. */
 __attribute__((used, naked, noinline))
@@ -6,8 +6,8 @@ static bool stock_font_get_glyph_dsc(const uint32_t *font, void *glyph_dsc,
                                     uint32_t codepoint, uint32_t next_codepoint) {
     __asm volatile(
         "push.w {r1-r11, lr}\n"
-        "movw r12, #0xb3f1\n"
-        "movt r12, #0x004e\n"
+        "movw r12, #0x8b5d\n"
+        "movt r12, #0x0050\n"
         "bx r12\n");
 }
 

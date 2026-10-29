@@ -25,14 +25,14 @@ from pixel_codec import encode_bitmap
 from native_font_record import glyph_record as compact_glyph_record
 from maitree_shaping import shape_for_preview, ALT_COUNT, TAG_START, TAG_END, untag, adjustment, rounded_units
 from render_preview import glyph_index
-ARTIFACT = ROOT / "build" / "g2_2.3.2.14_thai.bin"
+ARTIFACT = ROOT / "build" / "g2_2.4.0.24_thai.bin"
 SPEC = ROOT / "patches" / "thai_patches.json"
 
 LOAD = 0x437FE0
-LETTER_HELPER_SITE = 0x00493FC0
-DECODE_SLOT_INDIRECT = 0x00494330
-STOCK_CHAIN_BUILD = 0x00471238
-LV_MALLOC = 0x0047EC6A
+LETTER_HELPER_SITE = 0x0049F1E4
+DECODE_SLOT_INDIRECT = 0x0049F554
+STOCK_CHAIN_BUILD = 0x004758F0
+LV_MALLOC = 0x00480876
 RAM_BASE = 0x20000000
 STACK_TOP = RAM_BASE + 0xFF000
 EMU_DONE = 0x00080000
@@ -240,8 +240,8 @@ class ThaiDevicePathTests(unittest.TestCase):
     def test_decode_slot_matches_stock_dispatch(self) -> None:
         storage = self.read_word(DECODE_SLOT_INDIRECT)
         decoder = self.read_word(storage)
-        self.assertEqual(storage, 0x007F0324)
-        self.assertEqual(decoder, 0x004940E3)
+        self.assertEqual(storage, 0x007B9ED0)
+        self.assertEqual(decoder, 0x0049F307)
 
     def test_ascii_decodes_through_hook(self) -> None:
         text = self.utf8("abc")

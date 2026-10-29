@@ -1,6 +1,6 @@
 # g2-thai
 
-`g2-thai` patches the Even Realities G2 2.3.2.14 firmware with a Thai bitmap
+`g2-thai` patches the Even Realities G2 2.4.0.24 firmware with a Thai bitmap
 fallback font. It uses Maitree ExtraLight at native pixel resolution and preserves the stock
 LVGL/FreeType paths for Latin, Japanese, and other unrelated glyphs.
 
@@ -9,7 +9,7 @@ vendor image from Even's CDN, verifies its SHA-256, applies a committed binary
 patch, verifies every EVENOTA checksum, and writes:
 
 ```text
-build/g2_2.3.2.14_thai.bin
+build/g2_2.4.0.24_thai.bin
 ```
 
 ## Build
@@ -82,10 +82,10 @@ Case-USB pins for this artifact and its matching stock rollback image
 
 The companion remains pinned to the reviewed revision with our local-file
 support. SybilSight's later removal of custom firmware support is not imported.
-The upstream WebFlasher catalog commit `2fcdb888` (October 10, 2026) supplied
-the 2.3.2.14 stock provenance, independently verified against Even's CDN; see
-[`2.3.2.14 rebase evidence`](docs/rebases/2.3.2.14.md). Load either 2.3.2.14
-image from disk; the vendored companion's catalog is older.
+The 2.4.0.24 stock provenance comes from the supplied Even update metadata;
+two Even CDN downloads matched byte-for-byte, including the published MD5 and
+size. See [`2.4.0.24 rebase evidence`](docs/rebases/2.4.0.24.md).
+Load either 2.4.0.24 image from disk; the vendored companion's catalog is older.
 
 ```sh
 make webflasher

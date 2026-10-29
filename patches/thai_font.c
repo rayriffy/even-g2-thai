@@ -1,4 +1,4 @@
-/* Maitree ExtraLight fallback for G2 2.3.2.14, full-resolution A1. */
+/* Maitree ExtraLight fallback for G2 2.4.0.24, full-resolution A1. */
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -13,15 +13,15 @@
 #define FONT_BITMAP_MAGIC 0xA11D0002u
 #define FONT_DATA_MAGIC 0xA11D0003u
 #define LV_FONT_GLYPH_FORMAT_A8 0x08u
-#define STOCK_CHAIN_BUILD_THUMB 0x00471239u
-#define LV_MALLOC_THUMB 0x0047EC6Bu
+#define STOCK_CHAIN_BUILD_THUMB 0x004758F1u
+#define LV_MALLOC_THUMB 0x00480877u
 /* The stock letter helper loads its UTF-8 decoder through the double pointer
-   at 0x00494330 (slot address, then function pointer) so it always matches
+   at 0x0049F554 (slot address, then function pointer) so it always matches
    the firmware's active text encoder. Calling any hardcoded entry instead
    breaks that contract: the old 2.2.9.22 helper at 0x00491E24 dereferences its offset
    argument unconditionally and faults when the lookahead pass passes NULL,
    which is exactly how the stock helper invokes its decoder. */
-#define STOCK_DECODE_SLOT_INDIRECT 0x00494330u
+#define STOCK_DECODE_SLOT_INDIRECT 0x0049F554u
 #define WRITABLE_RAM_BASE 0x20000000u
 #define WRITABLE_RAM_END 0x20080000u
 #define GLYPH_DSC_SIZE 32u

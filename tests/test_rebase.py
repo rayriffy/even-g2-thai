@@ -1,4 +1,4 @@
-"""Authenticate the 2.3.2.14 mapping and preserve all stock components."""
+"""Authenticate the 2.4.0.24 mapping and preserve all stock components."""
 from __future__ import annotations
 
 import hashlib
@@ -12,25 +12,25 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from apply_patches import apply_spec
-from generate_patch import APP_LOAD_ADDR, APP_MAX_END, APP_PREAMBLE, G2_FILE_DELTA, mainapp, crc32c_msb, build_spec
+from generate_patch import APP_LOAD_ADDR, APP_MAX_END, APP_PREAMBLE, G2_FILE_DELTA, mainapp, crc32c_msb, build_spec, encode_bl
 from verify_firmware import verify
 
 
 class RebaseTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        stock = ROOT / ".cache/g2_2.3.2.14.bin"
+        stock = ROOT / ".cache/g2_2.4.0.24.bin"
         if not stock.exists():
             raise unittest.SkipTest("stock firmware cache absent")
         cls.stock = stock.read_bytes()
         cls.spec = json.loads((ROOT / "patches/thai_patches.json").read_text())
-        cls.record = json.loads((ROOT / "docs/rebases/2.3.2.14.json").read_text())
+        cls.record = json.loads((ROOT / "docs/rebases/2.4.0.24.json").read_text())
 
     def test_component_mapping_is_derived_from_new_container(self):
         index, offset, size = mainapp(self.stock)
-        self.assertEqual((index, offset, size), (5, 0xBE370, 3922636))
+        self.assertEqual((index, offset, size), (5, 0xBEF35, 3700100))
         self.assertEqual(APP_LOAD_ADDR - offset - 128 - APP_PREAMBLE, G2_FILE_DELTA)
-        self.assertIn(b"s200_v2.3.2.14", self.stock)
+        self.assertIn(b"s200_v2.4.0.24", self.stock)
         self.assertEqual(hashlib.sha256(self.stock).hexdigest(), self.record["stock_sha256"])
         self.assertEqual(len(self.stock), self.record["stock_size"])
 
@@ -42,6 +42,8 @@ class RebaseTests(unittest.TestCase):
             payload = self.stock[offset + 128:offset + size]
             name = self.stock[offset + 48:offset + 128].split(b"\0")[0].decode()
             self.assertEqual(name, expected["name"])
+            self.assertEqual(struct.unpack_from("<I", self.stock, offset + 0x24)[0],
+                             expected["typeId"])
             self.assertEqual(hashlib.sha256(payload).hexdigest(), expected["sha256"])
             if index != 5:
                 self.assertEqual(patched[offset:offset + size], self.stock[offset:offset + size])
@@ -60,6 +62,28 @@ class RebaseTests(unittest.TestCase):
                 address = int(anchor["new_address"], 16) + anchor["anchor_offset"]
                 self.assertEqual(self.stock.find(needle), address - G2_FILE_DELTA)
 
+    def test_stock_chain_builder_has_exactly_the_two_rebased_callers(self):
+        _, offset, size = mainapp(self.stock)
+        payload = self.stock[offset + 128:offset + 128 + size]
+        callers = []
+        for relative in range(APP_PREAMBLE, len(payload) - 3, 2):
+            address = APP_LOAD_ADDR + relative - APP_PREAMBLE
+            if payload[relative:relative + 4] == encode_bl(address, 0x4758F0):
+                callers.append(address)
+        self.assertEqual(callers, [0x476204, 0x476262])
+
+    def test_decoder_dispatch_follows_both_stock_indirections(self):
+        load = 0x49F1F0
+        self.assertEqual(self.stock[load - G2_FILE_DELTA:load - G2_FILE_DELTA + 4],
+                         bytes.fromhex("dff86083"))
+        literal = ((load + 4) & ~3) + 0x360
+        storage = struct.unpack_from("<I", self.stock, literal - G2_FILE_DELTA)[0]
+        decoder = struct.unpack_from("<I", self.stock, storage - G2_FILE_DELTA)[0]
+        self.assertEqual((literal, storage, decoder), (0x49F554, 0x7B9ED0, 0x49F307))
+        self.assertEqual(self.record["decoder_dispatch"],
+                         dict(literal=f"0x{literal:08X}", storage=f"0x{storage:08X}",
+                              thumb_entry=f"0x{decoder:08X}"))
+
     def test_mismatched_stock_is_rejected(self):
         altered = bytearray(self.stock)
         altered[-1] ^= 1
@@ -70,7 +94,7 @@ class RebaseTests(unittest.TestCase):
         patched = apply_spec(self.stock, self.spec)
         _, offset, size = mainapp(self.stock)
         allowed = set(range(offset + 128, offset + 136))
-        for address in (0x471BC8, 0x471C26, 0x493FC0, 0x4EB3EC):
+        for address in (0x476204, 0x476262, 0x49F1E4, 0x508B58):
             allowed.update(range(address - G2_FILE_DELTA, address - G2_FILE_DELTA + 4))
         changed = {i for i in range(offset + 128, offset + 128 + size)
                    if self.stock[i] != patched[i]}
@@ -78,7 +102,7 @@ class RebaseTests(unittest.TestCase):
 
     def test_install_limit_and_settings_are_authenticated_stock_literals(self):
         self.assertEqual(APP_MAX_END, 0x7FE000)
-        for literal, expected in ((0x44AE68, 0x7FE000), (0x481C68, 0x7FF000)):
+        for literal, expected in ((0x44B210, 0x7FE000), (0x483830, 0x7FF000)):
             self.assertEqual(struct.unpack_from("<I", self.stock, literal - G2_FILE_DELTA)[0], expected)
         self.assertLess(int(self.spec["metadata"]["programmed_end"], 16), APP_MAX_END)
 

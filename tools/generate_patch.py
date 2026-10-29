@@ -15,32 +15,32 @@ from pixel_codec import decode_native_bitmap
 from native_font_record import unpack_record, RECORD_SIZE
 from maitree_shaping import GLYPH_COUNT
 
-STOCK_SHA256 = "26b6067665a441b779c47f6b95427b8b4bb5f502aaf527466dadce628aeb00b2"
+STOCK_SHA256 = "363198f8d543a5c1181d8a213e9077285cb865700a1885c8dc7c1b9324fd0e05"
 FONT_SOURCE = Path(__file__).resolve().parents[1] / "fonts/maitree/Maitree-ExtraLight.ttf"
 FONT_SHA256 = hashlib.sha256(FONT_SOURCE.read_bytes()).hexdigest()
 FONT_SOURCE_COMMIT = "google/fonts:bd8f81ddb5c74d5c8897b36ad88b440266245103"
 MAINAPP_SUFFIX = "ota/s200_firmware_ota.bin"
 APP_LOAD_ADDR = 0x00438000
 APP_PREAMBLE = 0x20
-# Version-specific: stock ends at 0x7F5AAC, the OTA word is 0x7FE000,
+# Version-specific: stock ends at 0x7BF564, the OTA word is 0x7FE000,
 # and the MRAM settings page is 0x7FF000. See the rebase disassembly.
 APP_MAX_END = 0x007FE000
-G2_FILE_DELTA = 0x379BF0
+G2_FILE_DELTA = 0x37902B
 FONT_DSC_MAGIC = 0xA11D0001
 FONT_BITMAP_MAGIC = 0xA11D0002
 FONT_DATA_MAGIC = 0xA11D0003
 HOOK_SITES = {
-    0x00471BC8: bytes.fromhex("ff f7 36 fb"),
-    0x00471C26: bytes.fromhex("ff f7 07 fb"),
+    0x00476204: bytes.fromhex("ff f7 74 fb"),
+    0x00476262: bytes.fromhex("ff f7 45 fb"),
 }
-TEXT_HELPER_SITE = (0x00493FC0, bytes.fromhex("2d e9 f0 41"))
+TEXT_HELPER_SITE = (0x0049F1E4, bytes.fromhex("2d e9 f0 41"))
 GLYPH_LOOKUP_SITE = (
-    0x004EB3EC,
+    0x00508B58,
     bytes.fromhex("2d e9 fe 4f 07 00 91 46 98 46 00 2f 10 d1 62 48"),
 )
 LV_MALLOC_SITE = (
-    0x0047EC6A,
-    bytes.fromhex("70 b5 04 00 00 25 82 4e 4f f4 7a 71 30 68 c4 f7"),
+    0x00480876,
+    bytes.fromhex("70 b5 04 00 00 25 82 4e 4f f4 7a 71 30 68 c2 f7"),
 )
 
 
@@ -287,11 +287,11 @@ def build_spec(stock: bytes, font_blob: bytes, build: dict[str, object]) -> dict
 
     return {
         "schema_version": 1,
-        "base": "g2_2.3.2.14.bin",
+        "base": "g2_2.4.0.24.bin",
         "base_sha256": STOCK_SHA256,
         "output_sha256": hashlib.sha256(data).hexdigest(),
         "metadata": {
-            "target": "Even Realities G2 2.3.2.14",
+            "target": "Even Realities G2 2.4.0.24",
             "glyph_lookup_hook_site": f"0x{lookup_site:08X}",
             "glyph_lookup_wrapper_address": f"0x{lookup_address:08X}",
             "component_count": struct.unpack_from("<I", stock, 8)[0],
