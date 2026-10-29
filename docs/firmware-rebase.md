@@ -94,6 +94,12 @@ reported `sourceUrl` from the Even CDN and independently verify it.
 Use this path when the target is absent from public archives or the app appears
 to use a different endpoint.
 
+The repository includes `even_firmware.py`, recovered from Android app 2.4.0,
+for authenticated G2/R1 URL discovery and optional macOS Keychain login reuse.
+Start with the [firmware URL guide](firmware-download.md) and
+[2.4.0 protocol evidence](protocol.md). The worked 2.2.8 analysis below documents
+the recovery procedure; verify the contract again when the vendor app changes.
+
 #### Authenticate the APK used for analysis
 
 The official Android package is `com.even.sg`:
@@ -173,6 +179,10 @@ token       # only when logged in
 region      # only when non-empty
 sign
 ```
+
+Those header conditions describe app 2.2.8. The included 2.4.0 client instead
+sends `region` whenever a token is present, including an empty value, as shown
+in the [2.4.0 method evidence](protocol.md).
 
 The `common` map is built from app/device information followed by glasses and
 locale state. Fields observed in app 2.2.8 were:

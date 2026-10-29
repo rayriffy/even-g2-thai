@@ -64,6 +64,21 @@ existing permission covers this project's reproduction, not reuse elsewhere.
 
 ## Firmware updates and rebasing
 
+Configure the extracted app constants locally as described in the
+[firmware URL guide](docs/firmware-download.md), then resolve a public G2 or R1 URL:
+
+```sh
+python3 even_firmware.py --save-login --email you@example.com --serial YOUR_G2_SERIAL
+python3 even_firmware.py --firmware-version 2.4.0.24 --json
+python3 even_firmware.py --r1 --serial YOUR_R1_SERIAL --json
+```
+
+The first command saves the login in macOS Keychain; later G2 and R1 requests
+reuse it. The client prints metadata and URLs without downloading or flashing.
+See the [firmware URL guide](docs/firmware-download.md) for version overrides,
+login removal, environment variables and tests, and the
+[Android 2.4.0 protocol evidence](docs/protocol.md) for the recovered request contract.
+
 When the installed glasses version changes, follow the complete
 [`docs/firmware-rebase.md`](docs/firmware-rebase.md) playbook before rebuilding
 or flashing. It covers official OTA discovery, APK/API analysis, address
