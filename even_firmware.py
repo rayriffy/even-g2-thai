@@ -218,7 +218,7 @@ def check_with_login(client, email=None, save_login=False, no_saved_login=False)
         return client.check_firmware()
     store, saved = None, None
     requested_region = client.region
-    if save_login or (sys.platform == "darwin" and not no_saved_login):
+    if save_login or (not no_saved_login and CredentialStore.is_supported()):
         store = CredentialStore(client.api_base)
         saved = store.load()
     if email and saved and email.strip().casefold() != saved["email"].casefold():

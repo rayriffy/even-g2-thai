@@ -279,6 +279,8 @@ class LoopbackFlowTests(unittest.TestCase):
             env["EVEN_PASSWORD"] = "test-password"
         with patch.dict(os.environ, env, clear=True):
             with patch("urllib.request.OpenerDirector.open", local_open), patch("even_firmware.CredentialStore") as store:
+                # The fake backend is available on every host; crypto keeps the real OS.
+                store.is_supported.return_value = True
                 self.last_store = store.return_value
                 self.last_store.load.return_value = saved_login
                 with redirect_stdout(output), redirect_stderr(errors):

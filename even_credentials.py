@@ -13,6 +13,10 @@ class CredentialStoreError(Exception):
 class CredentialStore:
     """One saved login per API origin, shared by G2 and R1."""
 
+    @staticmethod
+    def is_supported():
+        return sys.platform == "darwin"
+
     def __init__(self, api_base):
         self.service = "com.rayriffy.even-firmware:" + api_base
         self._cf = None
@@ -21,7 +25,7 @@ class CredentialStore:
     def _connect(self):
         if self._cf is not None:
             return
-        if sys.platform != "darwin":
+        if not self.is_supported():
             raise CredentialStoreError("Saved login requires macOS Keychain.")
         try:
             self._cf = ct.CDLL("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")

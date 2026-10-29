@@ -3,6 +3,7 @@ import io
 import os
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 import uuid
@@ -23,13 +24,13 @@ FIRMWARE = {"version": "2.4.0.24", "subPath": "/firmware/fixture.bin"}
 
 class SavedLoginTests(unittest.TestCase):
     def setUp(self):
-        for patcher in (patch.dict(os.environ, API_ENV, clear=True),
-                        patch("even_firmware.sys.platform", "darwin")):
-            patcher.start()
-            self.addCleanup(patcher.stop)
+        env_patch = patch.dict(os.environ, API_ENV, clear=True)
+        env_patch.start()
+        self.addCleanup(env_patch.stop)
         store_patch = patch("even_firmware.CredentialStore")
         self.store_class = store_patch.start()
         self.addCleanup(store_patch.stop)
+        self.store_class.is_supported.return_value = True
         self.store = self.store_class.return_value
         self.store.load.return_value = dict(RECORD)
         self.client = Mock(api_base=even.API_BASE, token="", region="", device_id="new-device")
@@ -55,6 +56,26 @@ class SavedLoginTests(unittest.TestCase):
         self.assertEqual(self.client.region, RECORD["region"])
         self.store.save.assert_not_called()
         self.store_class.assert_called_once_with(even.API_BASE)
+
+    def test_fake_backend_support_is_independent_of_callers_platform(self):
+        with patch("even_firmware.sys", SimpleNamespace(platform="linux", stderr=sys.stderr)):
+            self.assertEqual(even.check_with_login(self.client), FIRMWARE)
+        self.client.login.assert_not_called()
+        self.store.load.assert_called_once()
+
+    def test_unsupported_backend_skips_saved_login(self):
+        self.store_class.is_supported.return_value = False
+        with patch.dict(os.environ, {"EVEN_PASSWORD": "fixture-override"}):
+            even.check_with_login(self.client, email=RECORD["email"])
+        self.store_class.assert_not_called()
+        self.client.login.assert_called_once_with(RECORD["email"], "fixture-override")
+
+    def test_real_store_rejects_unsupported_platform_before_loading_native_apis(self):
+        with patch("even_credentials.sys", SimpleNamespace(platform="linux")):
+            self.assertFalse(CredentialStore.is_supported())
+            with patch("even_credentials.ct.CDLL", side_effect=AssertionError("unexpected native API")):
+                with self.assertRaises(CredentialStoreError):
+                    CredentialStore(even.API_BASE).load()
 
     def test_save_login_prompts_and_replaces_record_after_success(self):
         self.password_prompt.side_effect = None

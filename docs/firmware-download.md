@@ -130,3 +130,5 @@ verification with your account. See [protocol evidence](protocol.md).
 `make test` discovers these tests alongside the firmware patch tests. The URL
 client, API configuration, crypto and Keychain helpers live at the repository root; the APK and generated
 reverse-engineering output are not required to run either the client or its tests.
+Saved-session fixtures mock the backend's availability check rather than global
+`sys.platform`, so Linux CI can test session reuse while keeping Linux crypto.
