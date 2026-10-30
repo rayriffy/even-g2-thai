@@ -14,21 +14,18 @@ build/g2_2.4.0.24_thai.bin
 
 ## Build
 
-Clone `g2flash` beside this repository, then run:
+From a plain clone, run:
 
 ```sh
-set -euo pipefail
-g2flash_dirty="$(git -C ../g2flash status --porcelain --untracked-files=all | sed '/^?? \.DS_Store$/d')"
-test -z "$g2flash_dirty"
-git -C ../g2flash checkout --detach 877c8d9490db0d3717ca012dd0f54556af3701bd
-test "$(git -C ../g2flash rev-parse HEAD)" = 877c8d9490db0d3717ca012dd0f54556af3701bd
-g2flash_dirty="$(git -C ../g2flash status --porcelain --untracked-files=all | sed '/^?? \.DS_Store$/d')"
-test -z "$g2flash_dirty"
 make build
 ```
 
-`g2flash` supplies the reviewed Thumb-2 compiler helper. Set
-`G2FLASH_ROOT=/path/to/g2flash` if it is elsewhere. Firmware writes use the
+The build initializes [`third_party/g2flash`](https://github.com/jimrandomh/g2flash)
+automatically at reviewed commit `877c8d9490db0d3717ca012dd0f54556af3701bd`.
+It supplies the Thumb-2 compiler helper; no sibling checkout is needed.
+Existing helper checkouts must match that revision and have no source changes.
+Set `G2FLASH_ROOT=/path/to/g2flash` to use a separately managed checkout with
+the same checks. Firmware writes use the
 vendored WebFlasher Case-USB route documented in [`docs/flashing.md`](docs/flashing.md).
 
 To regenerate the font payload and committed patch after source changes:

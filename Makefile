@@ -6,7 +6,7 @@ build:
 patch:
 	./build_thai.sh --update-patches
 
-test:
+test: build
 	python3 -m unittest discover -s tests -v
 
 check: build test

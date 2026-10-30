@@ -1,3 +1,6 @@
 [submodule "third_party/evenRealities-webflasher"]
 	path = third_party/evenRealities-webflasher
 	url = https://github.com/AM-Guru/evenRealities-webflasher.git
+[submodule "third_party/g2flash"]
+	path = third_party/g2flash
+	url = https://github.com/jimrandomh/g2flash.git

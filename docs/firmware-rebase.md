@@ -34,9 +34,11 @@ This offline procedure cannot prove physical boot or rendering.
 - [`g2-thai`](../README.md): Thai font source, patch generator, committed patch
   specification, tests, and this playbook.
 - [`g2flash`](https://github.com/jimrandomh/g2flash): EVENOTA parser,
-  checksum/MRAM validation, and compiler helper. The reviewed revision for this
-  playbook is
-  `877c8d9490db0d3717ca012dd0f54556af3701bd`.
+  checksum/MRAM validation, and compiler helper. Vendored at
+  `third_party/g2flash`, reviewed revision
+  `877c8d9490db0d3717ca012dd0f54556af3701bd`. The build initializes the pinned
+  submodule when absent; existing or `G2FLASH_ROOT` override checkouts must
+  already be clean and pinned.
 - [`evenRealities-openCFW`](https://github.com/kalanihelekunihi/evenRealities-openCFW):
   broader G2 firmware research and source reconstruction.
 - [`Even-G2-RE`](https://github.com/lonelyobserver0/Even-G2-RE): independent app/API route research.
@@ -305,7 +307,7 @@ import importlib.util
 import sys
 from pathlib import Path
 
-module_spec = importlib.util.spec_from_file_location("g2flash", "../g2flash/g2flash.py")
+module_spec = importlib.util.spec_from_file_location("g2flash", "third_party/g2flash/g2flash.py")
 g2flash = importlib.util.module_from_spec(module_spec)
 module_spec.loader.exec_module(g2flash)
 g2flash.DEBUG = False

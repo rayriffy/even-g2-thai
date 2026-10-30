@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-G2FLASH_ROOT="${G2FLASH_ROOT:-$ROOT/../g2flash}"
+G2FLASH_ROOT="${G2FLASH_ROOT:-$ROOT/third_party/g2flash}"
 G2FLASH_COMMIT="877c8d9490db0d3717ca012dd0f54556af3701bd"
 CACHE="$ROOT/.cache"
 BUILD="$ROOT/build"
@@ -66,6 +66,9 @@ fetch_verified() {
 }
 
 mkdir -p "$CACHE" "$BUILD"
+if [[ "$G2FLASH_ROOT" == "$ROOT/third_party/g2flash" && ! -e "$G2FLASH_ROOT/.git" ]]; then
+  git -C "$ROOT" submodule update --init -- third_party/g2flash
+fi
 [[ -f "$G2FLASH_ROOT/patches/build.py" ]] || {
   echo "g2flash not found at $G2FLASH_ROOT (set G2FLASH_ROOT)" >&2
   exit 1

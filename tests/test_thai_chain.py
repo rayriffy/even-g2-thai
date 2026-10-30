@@ -18,7 +18,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-G2FLASH = Path(os.environ.get("G2FLASH_ROOT", ROOT.parent / "g2flash"))
+G2FLASH = Path(os.environ.get("G2FLASH_ROOT", ROOT / "third_party" / "g2flash"))
 SOURCE = ROOT / "patches" / "thai_font.c"
 PATCH_SPEC = ROOT / "patches" / "thai_patches.json"
 
